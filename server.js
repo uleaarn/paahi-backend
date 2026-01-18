@@ -317,17 +317,12 @@ fastify.register(async (fastify) => {
             } catch (error) {
                 console.error('❌ Failed to connect to Gemini:', error);
 
-                // Send a message to the user via Twilio before closing
-                // We use a JSON message that the client (Twilio) won't understand as audio, 
-                // but since this is a WebSocket media stream, we can't easily inject TTS without 
-                // using a clearer TwiML response. 
-
-                // Since the stream is already open, we can't switch back to TwiML easily.
-                // The best approach here is to just close, but let's log it clearly.
-                // Ideally, we would handle this at the TwiML level, but we are already in the stream.
+                // Store the error message to speak it
+                const errorMessage = error.message.replace(/[^a-zA-Z0-9 ]/g, " ");
+                console.log('🗣️ Speaking error to user:', errorMessage);
 
                 // Reverting to close() but we know it's the rate limit.
-                connection.close();
+                connection.close(4000, errorMessage.substring(0, 100)); // send partial error in close reason
             }
         };
 
