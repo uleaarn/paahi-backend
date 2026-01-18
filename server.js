@@ -22,9 +22,49 @@ if (!GEMINI_API_KEY) {
     process.exit(1);
 }
 
-// Load menu and system instructions
-const menu = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'menu.json'), 'utf-8'));
-const systemInstructions = fs.readFileSync(path.join(__dirname, 'prompts', 'system-instructions.md'), 'utf-8');
+// Load menu and system instructions with better error handling
+let menu, systemInstructions;
+
+try {
+    console.log('📂 Current directory:', __dirname);
+    console.log('📂 Files in current directory:', fs.readdirSync(__dirname));
+
+    const menuPath = path.join(__dirname, 'data', 'menu.json');
+    const instructionsPath = path.join(__dirname, 'prompts', 'system-instructions.md');
+
+    console.log('📄 Loading menu from:', menuPath);
+    console.log('📄 Menu file exists:', fs.existsSync(menuPath));
+
+    if (fs.existsSync(path.join(__dirname, 'data'))) {
+        console.log('📂 Files in data directory:', fs.readdirSync(path.join(__dirname, 'data')));
+    } else {
+        console.error('❌ data directory does not exist!');
+    }
+
+    menu = JSON.parse(fs.readFileSync(menuPath, 'utf-8'));
+    console.log('✅ Menu loaded successfully');
+
+    console.log('📄 Loading instructions from:', instructionsPath);
+    console.log('📄 Instructions file exists:', fs.existsSync(instructionsPath));
+
+    if (fs.existsSync(path.join(__dirname, 'prompts'))) {
+        console.log('📂 Files in prompts directory:', fs.readdirSync(path.join(__dirname, 'prompts')));
+    } else {
+        console.error('❌ prompts directory does not exist!');
+    }
+
+    systemInstructions = fs.readFileSync(instructionsPath, 'utf-8');
+    console.log('✅ System instructions loaded successfully');
+} catch (error) {
+    console.error('❌ Failed to load required files:', error);
+    console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        syscall: error.syscall,
+        path: error.path
+    });
+    process.exit(1);
+}
 
 // Initialize Fastify
 const fastify = Fastify({ logger: true });
