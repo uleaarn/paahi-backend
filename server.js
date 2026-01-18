@@ -378,7 +378,7 @@ fastify.register(async (fastify) => {
                 geminiWs.send(JSON.stringify(greetingMessage));
             });
 
-            geminiWs.on('message', (data) => {
+            geminiWs.on('message', async (data) => {
                 try {
                     const response = JSON.parse(data.toString());
 
