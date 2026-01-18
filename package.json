@@ -1,0 +1,31 @@
+{
+    "name": "jalwa-voice-agent",
+    "version": "1.0.0",
+    "description": "Production Twilio → Gemini Live voice agent for Jalwa restaurant",
+    "main": "server.js",
+    "type": "module",
+    "scripts": {
+        "start": "node server.js",
+        "dev": "node --watch server.js",
+        "test": "node test-audio.js"
+    },
+    "keywords": [
+        "twilio",
+        "gemini",
+        "voice-agent",
+        "restaurant",
+        "ai"
+    ],
+    "author": "",
+    "license": "MIT",
+    "dependencies": {
+        "@google/generative-ai": "^0.21.0",
+        "dotenv": "^16.4.5",
+        "fastify": "^5.2.0",
+        "@fastify/websocket": "^11.0.1",
+        "ws": "^8.18.0"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
+}
