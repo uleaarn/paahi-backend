@@ -315,7 +315,49 @@ fastify.register(async (fastify) => {
                             parts: [
                                 { text: `${systemInstructions}\n\n## Menu Data\n${JSON.stringify(menu, null, 2)}` }
                             ]
-                        }
+                        },
+                        tools: [
+                            {
+                                functionDeclarations: [
+                                    {
+                                        name: "submit_order",
+                                        description: "Finalize and submit the customer's order to the kitchen. Use this when the customer confirms they are done ordering.",
+                                        parameters: {
+                                            type: "OBJECT",
+                                            properties: {
+                                                items: {
+                                                    type: "ARRAY",
+                                                    description: "List of items ordered",
+                                                    items: {
+                                                        type: "OBJECT",
+                                                        properties: {
+                                                            name: { type: "STRING", description: "Name of the dish (e.g., 'Butter Chicken')" },
+                                                            quantity: { type: "INTEGER", description: "Quantity ordered" },
+                                                            price: { type: "NUMBER", description: "Price per unit (if known, otherwise 0)" },
+                                                            modifiers: {
+                                                                type: "ARRAY",
+                                                                items: { type: "STRING" },
+                                                                description: "List of modifiers (e.g., 'spicy', 'extra sauce')"
+                                                            }
+                                                        },
+                                                        required: ["name", "quantity"]
+                                                    }
+                                                },
+                                                customerInfo: {
+                                                    type: "OBJECT",
+                                                    properties: {
+                                                        name: { type: "STRING", description: "Customer name" },
+                                                        phone: { type: "STRING", description: "Customer phone number" },
+                                                        address: { type: "STRING", description: "Delivery address (if applicable)" }
+                                                    }
+                                                }
+                                            },
+                                            required: ["items"]
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
                     }
                 };
                 geminiWs.send(JSON.stringify(setupMessage));
@@ -364,6 +406,45 @@ fastify.register(async (fastify) => {
                                 }
                             }
                         }
+                    }
+
+                    // Handle Tool Calls
+                    if (response.toolCall) {
+                        console.log('🛠️ Gemini requested tool:', JSON.stringify(response.toolCall));
+                        const functionCalls = response.toolCall.functionCalls;
+                        const toolResponses = [];
+
+                        for (const call of functionCalls) {
+                            if (call.name === 'submit_order') {
+                                const args = call.args;
+                                console.log('📦 Submitting order:', args);
+
+                                // Update OrderManager with the details provided by AI
+                                orderManager.reset(); // Clear basic state
+                                if (args.items) {
+                                    args.items.forEach(item => orderManager.addItem(item));
+                                }
+                                if (args.customerInfo) {
+                                    orderManager.setCustomerInfo(args.customerInfo);
+                                }
+
+                                const result = await orderManager.submitOrder();
+
+                                toolResponses.push({
+                                    id: call.id,
+                                    name: call.name,
+                                    response: { result: result }
+                                });
+                            }
+                        }
+
+                        // Send Tool Response back to Gemini
+                        const toolResponseMessage = {
+                            tool_response: {
+                                function_responses: toolResponses
+                            }
+                        };
+                        geminiWs.send(JSON.stringify(toolResponseMessage));
                     }
 
                     // Handle Turn Complete (Optional: listening for interrupt)
