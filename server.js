@@ -316,6 +316,9 @@ fastify.register(async (fastify) => {
 
             } catch (error) {
                 console.error('❌ Failed to connect to Gemini:', error);
+                // Close the connection if we can't connect to Gemini
+                // This prevents the user from just hearing silence
+                connection.close();
             }
         };
 
