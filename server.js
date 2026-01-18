@@ -397,6 +397,23 @@ fastify.get('/health', async (request, reply) => {
     return { status: 'ok', service: 'Jalwa Voice Agent' };
 });
 
+// TwiML endpoint for Twilio Voice Configuration
+fastify.all('/twiml', async (request, reply) => {
+    const host = request.headers.host || 'localhost';
+    const protocol = host.includes('localhost') ? 'ws' : 'wss';
+    const wsUrl = `${protocol}://${host}/media-stream`;
+
+    console.log('📞 TwiML requested, WebSocket URL:', wsUrl);
+
+    reply.type('text/xml');
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Connect>
+        <Stream url="${wsUrl}" />
+    </Connect>
+</Response>`;
+});
+
 // Start server
 const start = async () => {
     try {
