@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import FastifyWebSocket from '@fastify/websocket';
+import FastifyFormBody from '@fastify/formbody';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { WebSocket } from 'ws';
 import dotenv from 'dotenv';
@@ -69,6 +70,7 @@ try {
 // Initialize Fastify
 const fastify = Fastify({ logger: true });
 await fastify.register(FastifyWebSocket);
+await fastify.register(FastifyFormBody);
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
