@@ -425,6 +425,7 @@ fastify.all('/twiml', async (request, reply) => {
     <Connect>
         <Stream url="${wsUrl}" />
     </Connect>
+    <Say>I am sorry, but the AI service is currently busy. Please try calling again in a minute.</Say>
 </Response>`;
 });
 
