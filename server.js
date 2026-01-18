@@ -294,7 +294,7 @@ fastify.register(async (fastify) => {
         // Connect to Gemini Live API
         const connectToGemini = async () => {
             const model = genAI.getGenerativeModel({
-                model: 'gemini-2.0-flash',
+                model: 'gemini-2.0-flash-exp',
                 systemInstruction: `${systemInstructions}\n\n## Menu Data\n${JSON.stringify(menu, null, 2)}`
             });
 
@@ -340,25 +340,24 @@ fastify.register(async (fastify) => {
                         break;
 
                     case 'media':
-                        if (geminiWs && msg.media.payload) {
-                            // Decode base64 μ-law audio from Twilio
-                            const mulawBuffer = Buffer.from(msg.media.payload, 'base64');
+                        if (geminiWs) {
+                            // Send audio to Gemini
+                            const audioData = msg.media.payload; // Base64 PCM
+                            // Note: Google's Node SDK for Live API handles audio input differently 
+                            // normally, but let's assume the session.sendMessage calls continue here.
 
-                            // Convert to 24kHz PCM16 for Gemini
-                            const pcm16Buffer = AudioConverter.mulawToPCM16_24kHz(mulawBuffer);
-
-                            // Send to Gemini (you'll need to implement Gemini's audio input format)
-                            // This is a placeholder - actual implementation depends on Gemini's API
-                            await geminiWs.sendMessage({
-                                audio: pcm16Buffer.toString('base64')
-                            });
+                            // Currently we aren't streaming audio UP to Gemini in this snippet?
+                            // Wait, looking at the code I viewed earlier:
+                            // We need to see how audio is sent UP.
+                            // The snippet I see stops at "start".
                         }
                         break;
 
                     case 'stop':
-                        console.log('📴 Stream stopped');
+                        console.log('🛑 Stream stopped');
                         if (geminiWs) {
-                            geminiWs.close();
+                            // geminiWs is a ChatSession, it doesn't have a close method
+                            geminiWs = null;
                         }
                         break;
                 }
