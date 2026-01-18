@@ -287,43 +287,105 @@ fastify.register(async (fastify) => {
     fastify.get('/media-stream', { websocket: true }, (connection, req) => {
         console.log('📞 Twilio connected');
 
-        let geminiWs = null;
         let streamSid = null;
+        let geminiWs = null;
         const orderManager = new OrderManager();
 
-        // Connect to Gemini Live API
-        const connectToGemini = async () => {
-            const model = genAI.getGenerativeModel({
-                model: 'gemini-2.0-flash-exp',
-                systemInstruction: `${systemInstructions}\n\n## Menu Data\n${JSON.stringify(menu, null, 2)}`
-            });
+        // Connect to Gemini Live API directly via WebSocket
+        const connectToGemini = () => {
+            const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${GEMINI_API_KEY}`;
+            console.log('🌐 Connecting to Gemini:', url.split('?')[0]); // Log URL without key
 
-            try {
-                const session = await model.startChat({
-                    generationConfig: {
-                        responseModalities: 'audio',
-                        speechConfig: {
-                            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } }
-                        }
-                    }
-                });
+            geminiWs = new WebSocket(url);
 
-                geminiWs = session;
+            geminiWs.on('open', () => {
                 console.log('🤖 Connected to Gemini Live API');
 
-                // Send initial greeting
-                await session.sendMessage('Start the conversation by greeting the customer warmly.');
+                // 1. Send Setup Message
+                const setupMessage = {
+                    setup: {
+                        model: "models/gemini-2.0-flash-exp",
+                        generationConfig: {
+                            responseModalities: ["AUDIO"],
+                            speechConfig: {
+                                voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } }
+                            }
+                        },
+                        systemInstruction: {
+                            parts: [
+                                { text: `${systemInstructions}\n\n## Menu Data\n${JSON.stringify(menu, null, 2)}` }
+                            ]
+                        }
+                    }
+                };
+                geminiWs.send(JSON.stringify(setupMessage));
 
-            } catch (error) {
-                console.error('❌ Failed to connect to Gemini:', error);
+                // 2. Send Initial Greeting Trigger
+                // We send a "client_content" message to prompt the AI to speak
+                const greetingMessage = {
+                    client_content: {
+                        turns: [
+                            {
+                                role: "user",
+                                parts: [{ text: "Start the conversation by greeting the customer warmly." }]
+                            }
+                        ],
+                        turn_complete: true
+                    }
+                };
+                geminiWs.send(JSON.stringify(greetingMessage));
+            });
 
-                // Store the error message to speak it
-                const errorMessage = error.message.replace(/[^a-zA-Z0-9 ]/g, " ");
-                console.log('🗣️ Speaking error to user:', errorMessage);
+            geminiWs.on('message', (data) => {
+                try {
+                    const response = JSON.parse(data.toString());
 
-                // Reverting to close() but we know it's the rate limit.
-                connection.close(4000, errorMessage.substring(0, 100)); // send partial error in close reason
-            }
+                    // Handle Audio Output
+                    if (response.serverContent && response.serverContent.modelTurn) {
+                        const parts = response.serverContent.modelTurn.parts;
+                        for (const part of parts) {
+                            if (part.inlineData && part.inlineData.mimeType.startsWith('audio/pcm')) {
+                                // Extract PCM16 data (Base64)
+                                const pcm16Base64 = part.inlineData.data;
+                                const pcm16Buffer = Buffer.from(pcm16Base64, 'base64');
+
+                                // Convert to μ-law 8kHz for Twilio
+                                const mulawBuffer = AudioConverter.pcm16_24kHzToMulaw(pcm16Buffer);
+
+                                // Send to Twilio
+                                if (streamSid) {
+                                    connection.send(JSON.stringify({
+                                        event: 'media',
+                                        streamSid: streamSid,
+                                        media: {
+                                            payload: mulawBuffer.toString('base64')
+                                        }
+                                    }));
+                                }
+                            }
+                        }
+                    }
+
+                    // Handle Turn Complete (Optional: listening for interrupt)
+                    if (response.serverContent && response.serverContent.turnComplete) {
+                        // AI finished speaking this turn
+                    }
+
+                } catch (error) {
+                    console.error('❌ Error parsing Gemini message:', error);
+                }
+            });
+
+            geminiWs.on('error', (error) => {
+                console.error('❌ Gemini WebSocket error:', error);
+                // Speak error to user if possible
+                const errorMessage = error.message || "Connection Error";
+                connection.close(4000, errorMessage.substring(0, 100));
+            });
+
+            geminiWs.on('close', (code, reason) => {
+                console.log(`🤖 Gemini disconnected: ${code} - ${reason}`);
+            });
         };
 
         connectToGemini();
@@ -340,58 +402,43 @@ fastify.register(async (fastify) => {
                         break;
 
                     case 'media':
-                        if (geminiWs) {
-                            // Send audio to Gemini
-                            const audioData = msg.media.payload; // Base64 PCM
-                            // Note: Google's Node SDK for Live API handles audio input differently 
-                            // normally, but let's assume the session.sendMessage calls continue here.
+                        if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
+                            // 1. Get μ-law audio from Twilio
+                            const mulawPayload = msg.media.payload;
+                            const mulawBuffer = Buffer.from(mulawPayload, 'base64');
 
-                            // Currently we aren't streaming audio UP to Gemini in this snippet?
-                            // Wait, looking at the code I viewed earlier:
-                            // We need to see how audio is sent UP.
-                            // The snippet I see stops at "start".
+                            // 2. Convert to PCM16 24kHz for Gemini
+                            const pcm16Buffer = AudioConverter.mulawToPCM16_24kHz(mulawBuffer);
+                            const pcm16Base64 = pcm16Buffer.toString('base64');
+
+                            // 3. Send Realtime Input to Gemini
+                            const audioMessage = {
+                                realtime_input: {
+                                    media_chunks: [
+                                        {
+                                            mime_type: "audio/pcm",
+                                            data: pcm16Base64
+                                        }
+                                    ]
+                                }
+                            };
+                            geminiWs.send(JSON.stringify(audioMessage));
                         }
                         break;
 
                     case 'stop':
                         console.log('🛑 Stream stopped');
-                        if (geminiWs) {
-                            // geminiWs is a ChatSession, it doesn't have a close method
-                            geminiWs = null;
-                        }
+                        if (geminiWs) geminiWs.close();
                         break;
                 }
             } catch (error) {
-                console.error('❌ Error processing message:', error);
+                console.error('❌ Error processing Twilio message:', error);
             }
         });
 
-        // Handle Gemini responses
-        // Note: This is a placeholder - actual implementation depends on Gemini's streaming API
-        const handleGeminiResponse = async (audioData) => {
-            try {
-                // Convert Gemini's 24kHz PCM16 to Twilio's 8kHz μ-law
-                const pcm16Buffer = Buffer.from(audioData, 'base64');
-                const mulawBuffer = AudioConverter.pcm16_24kHzToMulaw(pcm16Buffer);
-
-                // Send to Twilio
-                connection.send(JSON.stringify({
-                    event: 'media',
-                    streamSid: streamSid,
-                    media: {
-                        payload: mulawBuffer.toString('base64')
-                    }
-                }));
-            } catch (error) {
-                console.error('❌ Error sending audio to Twilio:', error);
-            }
-        };
-
         connection.on('close', () => {
-            console.log('📴 Twilio disconnected');
-            if (geminiWs) {
-                geminiWs.close();
-            }
+            console.log('� Twilio disconnected');
+            if (geminiWs) geminiWs.close();
         });
 
         connection.on('error', (error) => {
