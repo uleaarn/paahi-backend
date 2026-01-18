@@ -294,7 +294,7 @@ fastify.register(async (fastify) => {
         // Connect to Gemini Live API
         const connectToGemini = async () => {
             const model = genAI.getGenerativeModel({
-                model: 'gemini-2.0-flash',
+                model: 'gemini-2.0-flash-exp',
                 systemInstruction: `${systemInstructions}\n\n## Menu Data\n${JSON.stringify(menu, null, 2)}`
             });
 
@@ -316,8 +316,17 @@ fastify.register(async (fastify) => {
 
             } catch (error) {
                 console.error('❌ Failed to connect to Gemini:', error);
-                // Close the connection if we can't connect to Gemini
-                // This prevents the user from just hearing silence
+
+                // Send a message to the user via Twilio before closing
+                // We use a JSON message that the client (Twilio) won't understand as audio, 
+                // but since this is a WebSocket media stream, we can't easily inject TTS without 
+                // using a clearer TwiML response. 
+
+                // Since the stream is already open, we can't switch back to TwiML easily.
+                // The best approach here is to just close, but let's log it clearly.
+                // Ideally, we would handle this at the TwiML level, but we are already in the stream.
+
+                // Reverting to close() but we know it's the rate limit.
                 connection.close();
             }
         };
