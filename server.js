@@ -382,6 +382,23 @@ fastify.register(async (fastify) => {
                 try {
                     const response = JSON.parse(data.toString());
 
+                    // Log message structure for debugging
+                    if (response.serverContent) {
+                        if (response.serverContent.modelTurn) {
+                            console.log('🤖 Gemini sent ModelTurn (Audio/Text)');
+                        }
+                        if (response.serverContent.turnComplete) {
+                            console.log('🏁 Gemini TurnComplete');
+                        }
+                        if (response.serverContent.interrupted) {
+                            console.log('⚠️ Gemini Interrupted');
+                        }
+                    } else if (response.toolCall) {
+                        console.log('🛠️ Gemini ToolCall received');
+                    } else {
+                        console.log('ℹ️ Gemini sent other message:', Object.keys(response));
+                    }
+
                     // Handle Audio Output
                     if (response.serverContent && response.serverContent.modelTurn) {
                         const parts = response.serverContent.modelTurn.parts;
@@ -403,7 +420,12 @@ fastify.register(async (fastify) => {
                                             payload: mulawBuffer.toString('base64')
                                         }
                                     }));
+                                    // console.log('📤 Sent audio chunk to Twilio');  // Uncomment for very verbose logs
+                                } else {
+                                    console.warn('⚠️ No StreamSid, dropping audio chunk');
                                 }
+                            } else if (part.text) {
+                                console.log('💬 Gemini Text:', part.text);
                             }
                         }
                     }
@@ -445,11 +467,6 @@ fastify.register(async (fastify) => {
                             }
                         };
                         geminiWs.send(JSON.stringify(toolResponseMessage));
-                    }
-
-                    // Handle Turn Complete (Optional: listening for interrupt)
-                    if (response.serverContent && response.serverContent.turnComplete) {
-                        // AI finished speaking this turn
                     }
 
                 } catch (error) {
