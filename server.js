@@ -78,22 +78,24 @@ const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 // Audio conversion utilities
 class AudioConverter {
     /**
-     * Convert Twilio's 8kHz μ-law to Gemini's 24kHz PCM16
+     * Convert Twilio's 8kHz μ-law to Gemini's 16kHz PCM16
      * @param {Buffer} mulawBuffer - μ-law encoded audio from Twilio
-     * @returns {Buffer} - PCM16 audio at 24kHz
+     * @returns {Buffer} - PCM16 audio at 16kHz
      */
-    static mulawToPCM16_24kHz(mulawBuffer) {
+    static mulawToPCM16_16kHz(mulawBuffer) {
         // Step 1: Decode μ-law to PCM16 at 8kHz
         const pcm16_8kHz = this.decodeMulaw(mulawBuffer);
 
-        // Step 2: Resample from 8kHz to 24kHz
-        const pcm16_24kHz = this.resample(pcm16_8kHz, 8000, 24000);
+        // Step 2: Resample from 8kHz to 16kHz
+        const pcm16_16kHz = this.resample(pcm16_8kHz, 8000, 16000);
 
-        return pcm16_24kHz;
+        return pcm16_16kHz;
     }
 
     /**
      * Convert Gemini's 24kHz PCM16 to Twilio's 8kHz μ-law
+     * Note: Gemini output is usually 24kHz by default, so we keep this one as is or handle dynamic rates if needed.
+     * We'll assume Gemini KEEPS sending 24kHz for now.
      * @param {Buffer} pcm16Buffer - PCM16 audio at 24kHz from Gemini
      * @returns {Buffer} - μ-law encoded audio at 8kHz
      */
@@ -202,6 +204,15 @@ class AudioConverter {
         }
 
         return outputBuffer;
+    }
+
+    static calculateRMS(buffer) {
+        let sum = 0;
+        for (let i = 0; i < buffer.length; i += 2) {
+            const sample = buffer.readInt16LE(i);
+            sum += sample * sample;
+        }
+        return Math.sqrt(sum / (buffer.length / 2));
     }
 }
 
@@ -506,8 +517,8 @@ fastify.register(async (fastify) => {
                             const mulawPayload = msg.media.payload;
                             const mulawBuffer = Buffer.from(mulawPayload, 'base64');
 
-                            // 2. Convert to PCM16 24kHz for Gemini
-                            const pcm16Buffer = AudioConverter.mulawToPCM16_24kHz(mulawBuffer);
+                            // 2. Convert to PCM16 16kHz for Gemini
+                            const pcm16Buffer = AudioConverter.mulawToPCM16_16kHz(mulawBuffer);
                             const pcm16Base64 = pcm16Buffer.toString('base64');
 
                             // 3. Send Realtime Input to Gemini
@@ -523,9 +534,10 @@ fastify.register(async (fastify) => {
                             };
                             geminiWs.send(JSON.stringify(audioMessage));
 
-                            // Log occasionally to verify input stream (1/100 chance)
-                            if (Math.random() < 0.01) {
-                                console.log('🎤 Sending audio chunk to Gemini...');
+                            // Log occasionally to verify input stream and volume
+                            if (Math.random() < 0.05) { // Increased sample rate to 5% for debugging
+                                const rms = AudioConverter.calculateRMS(pcm16Buffer);
+                                console.log(`🎤 Sending audio chunk to Gemini (RMS: ${rms.toFixed(2)})`);
                             }
                         }
                         break;
