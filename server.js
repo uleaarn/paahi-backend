@@ -266,14 +266,28 @@ class OrderManager {
         }, 0);
     }
 
-    async submitOrder() {
+    async submitOrder(args) {
         if (!N8N_WEBHOOK_URL) {
             console.warn('⚠️  N8N_WEBHOOK_URL not configured, order not sent');
             return { success: false, message: 'Webhook not configured' };
         }
 
+        // If arguments are provided (from Tool Call), use them to populate the order
+        if (args) {
+            if (args.items) {
+                console.log(`📦 Received ${args.items.length} items from tool arguments`);
+                this.currentOrder.items = args.items;
+            }
+            if (args.customerInfo) {
+                console.log(`👤 Received customer info from tool arguments:`, args.customerInfo);
+                this.currentOrder.customerInfo = args.customerInfo;
+            }
+        }
+
         this.currentOrder.timestamp = new Date().toISOString();
         this.currentOrder.total = this.calculateTotal();
+
+        console.log('📤 Submitting order to n8n:', JSON.stringify(this.currentOrder, null, 2));
 
         try {
             const response = await fetch(N8N_WEBHOOK_URL, {
