@@ -3,13 +3,13 @@
     "location": "215 Glenridge Ave, Montclair, NJ 07042",
     "phone": "(973) 250-6364",
     "hours": {
-        "monday": "Closed",
-        "tuesday": "5:00 PM - 9:30 PM",
-        "wednesday": "5:00 PM - 9:30 PM",
-        "thursday": "5:00 PM - 9:30 PM",
-        "friday": "5:00 PM - 10:00 PM",
-        "saturday": "5:00 PM - 10:00 PM",
-        "sunday": "5:00 PM - 9:30 PM"
+        "monday": "11:00 AM - 3:00 PM, 5:00 PM - 10:30 PM",
+        "tuesday": "11:00 AM - 3:00 PM, 5:00 PM - 10:30 PM",
+        "wednesday": "11:00 AM - 3:00 PM, 5:00 PM - 10:30 PM",
+        "thursday": "11:00 AM - 3:00 PM, 5:00 PM - 10:30 PM",
+        "friday": "11:00 AM - 3:00 PM, 5:00 PM - 11:00 PM",
+        "saturday": "11:00 AM - 3:00 PM, 5:00 PM - 11:00 PM",
+        "sunday": "11:00 AM - 3:00 PM, 5:00 PM - 9:30 PM"
     },
     "categories": [
         {
@@ -50,7 +50,8 @@
                     ],
                     "modifiers": [
                         "extra_spicy",
-                        "no_yogurt"
+                        "no_yogurt",
+                        "no_onion"
                     ],
                     "popular": true,
                     "vegetarian": true,
@@ -70,7 +71,8 @@
                     ],
                     "modifiers": [
                         "extra_spicy",
-                        "no_yogurt"
+                        "no_yogurt",
+                        "no_onion"
                     ],
                     "popular": true,
                     "vegetarian": true,
@@ -79,7 +81,7 @@
                 },
                 {
                     "id": "veg_app_004",
-                    "name": "Paneer Beet Tikki",
+                    "name": "Paneer Beetroot Tikki",
                     "description": "Cream cheese, yogurt, beetroot and potato crisps",
                     "base_price": 12.00,
                     "sizes": [
@@ -94,26 +96,6 @@
                     "popular": false,
                     "vegetarian": true,
                     "vegan": false,
-                    "gluten_free": false
-                },
-                {
-                    "id": "veg_app_005",
-                    "name": "Gobi Manchurian",
-                    "description": "Cauliflower florets tossed in soy burnt garlic sauce",
-                    "base_price": 12.00,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 12.00
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": true,
                     "gluten_free": false
                 },
                 {
@@ -178,27 +160,8 @@
                     "gluten_free": true
                 },
                 {
-                    "id": "veg_app_009",
-                    "name": "Paneer Tikka Cutlet",
-                    "description": "Crispy golden patty of spiced hung curd paneer with creamy center",
-                    "base_price": 13.00,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 13.00
-                        }
-                    ],
-                    "modifiers": [
-                        "mint_chutney"
-                    ],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": false
-                },
-                {
                     "id": "veg_app_010",
-                    "name": "Naan and Eggplant Dip",
+                    "name": "Fig Naan and Eggplant Dip",
                     "description": "Fluffy naan served with spiced eggplant mash and figs",
                     "base_price": 12.00,
                     "sizes": [
@@ -1808,17 +1771,17 @@
         },
         "mint_chutney": {
             "name": "Add Mint Chutney",
-            "price": 1.00,
+            "price": 0,
             "description": "Extra mint chutney"
         },
         "tamarind_chutney": {
             "name": "Add Tamarind Chutney",
-            "price": 1.00,
+            "price": 0,
             "description": "Extra tamarind chutney"
         },
         "extra_sauce": {
             "name": "Extra Sauce",
-            "price": 1.50,
+            "price": 0,
             "description": "Additional gravy"
         },
         "less_cream": {
@@ -1828,68 +1791,23 @@
         },
         "extra_cream": {
             "name": "Extra Cream",
-            "price": 1.00,
+            "price": 0,
             "description": "More cream"
         },
         "butter": {
             "name": "Add Butter",
-            "price": 0.50,
+            "price": 0,
             "description": "Butter topping"
         },
         "garlic": {
             "name": "Add Garlic",
-            "price": 1.00,
+            "price": 0,
             "description": "Garlic topping"
         },
         "extra_garlic": {
             "name": "Extra Garlic",
-            "price": 1.50,
+            "price": 0,
             "description": "Double garlic"
-        },
-        "extra_jalapeno": {
-            "name": "Extra Jalapeño",
-            "price": 0.50,
-            "description": "More jalapeños"
-        },
-        "boneless": {
-            "name": "Boneless",
-            "price": 0,
-            "description": "Remove bones"
-        },
-        "cumin_seeds": {
-            "name": "Cumin Seeds",
-            "price": 0,
-            "description": "Add cumin"
-        },
-        "less_sugar": {
-            "name": "Less Sugar",
-            "price": 0,
-            "description": "Reduce sweetness"
-        },
-        "extra_sweet": {
-            "name": "Extra Sweet",
-            "price": 0,
-            "description": "More sweet"
-        },
-        "warm": {
-            "name": "Serve Warm",
-            "price": 0,
-            "description": "Heated"
-        },
-        "roasted": {
-            "name": "Roasted",
-            "price": 0,
-            "description": "Roasted style"
-        },
-        "fried": {
-            "name": "Fried",
-            "price": 0,
-            "description": "Fried style"
-        },
-        "garlic_naan": {
-            "name": "Upgrade to Garlic Naan",
-            "price": 1.00,
-            "description": "Replace with garlic naan"
         }
     }
 }

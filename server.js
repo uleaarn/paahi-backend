@@ -328,6 +328,7 @@ fastify.register(async (fastify) => {
                 console.log('🤖 Connected to Gemini Live API');
 
                 // 1. Send Setup Message
+                const currentTime = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
                 const setupMessage = {
                     setup: {
                         model: "models/gemini-2.0-flash-exp",
@@ -339,7 +340,7 @@ fastify.register(async (fastify) => {
                         },
                         systemInstruction: {
                             parts: [
-                                { text: `${systemInstructions}\n\n## Menu Data\n${JSON.stringify(menu, null, 2)}` }
+                                { text: `Current Server Time: ${currentTime}\n\n${systemInstructions}\n\n## Menu Data\n${JSON.stringify(menu, null, 2)}` }
                             ]
                         },
                         tools: [
