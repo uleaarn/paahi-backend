@@ -391,7 +391,13 @@ fastify.register(async (fastify) => {
                             console.log('🏁 Gemini TurnComplete');
                         }
                         if (response.serverContent.interrupted) {
-                            console.log('⚠️ Gemini Interrupted');
+                            console.log('⚠️ Gemini Interrupted - Clearing Twilio Buffer');
+                            if (streamSid) {
+                                connection.send(JSON.stringify({
+                                    event: 'clear',
+                                    streamSid: streamSid
+                                }));
+                            }
                         }
                     } else if (response.toolCall) {
                         console.log('🛠️ Gemini ToolCall received');
@@ -420,12 +426,7 @@ fastify.register(async (fastify) => {
                                             payload: mulawBuffer.toString('base64')
                                         }
                                     }));
-                                    // console.log('📤 Sent audio chunk to Twilio');  // Uncomment for very verbose logs
-                                } else {
-                                    console.warn('⚠️ No StreamSid, dropping audio chunk');
                                 }
-                            } else if (part.text) {
-                                console.log('💬 Gemini Text:', part.text);
                             }
                         }
                     }
@@ -521,6 +522,11 @@ fastify.register(async (fastify) => {
                                 }
                             };
                             geminiWs.send(JSON.stringify(audioMessage));
+
+                            // Log occasionally to verify input stream (1/100 chance)
+                            if (Math.random() < 0.01) {
+                                console.log('🎤 Sending audio chunk to Gemini...');
+                            }
                         }
                         break;
 
