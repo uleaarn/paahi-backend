@@ -410,26 +410,6 @@
                     "gluten_free": true
                 },
                 {
-                    "id": "veg_entree_002",
-                    "name": "Gobi Manchurian",
-                    "description": "Cauliflower tossed with peppers, onions and tomatoes in Indian wok",
-                    "base_price": 17.00,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 17.00
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": true,
-                    "gluten_free": false
-                },
-                {
                     "id": "veg_entree_003",
                     "name": "Chana Masala",
                     "description": "Chickpeas cooked with onions, garlic, ginger and spices",
