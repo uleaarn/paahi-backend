@@ -93,6 +93,21 @@ class AudioConverter {
     }
 
     /**
+     * Convert Gemini's 16kHz PCM16 to Twilio's 8kHz μ-law
+     * @param {Buffer} pcm16Buffer - PCM16 audio at 16kHz from Gemini
+     * @returns {Buffer} - μ-law encoded audio at 8kHz
+     */
+    static pcm16_16kHzToMulaw(pcm16Buffer) {
+        // Step 1: Resample from 16kHz to 8kHz
+        const pcm16_8kHz = this.resample(pcm16Buffer, 16000, 8000);
+
+        // Step 2: Encode PCM16 to μ-law
+        const mulawBuffer = this.encodeMulaw(pcm16_8kHz);
+
+        return mulawBuffer;
+    }
+
+    /**
      * Convert Gemini's 24kHz PCM16 to Twilio's 8kHz μ-law
      * Note: Gemini output is usually 24kHz by default, so we keep this one as is or handle dynamic rates if needed.
      * We'll assume Gemini KEEPS sending 24kHz for now.
@@ -426,7 +441,8 @@ fastify.register(async (fastify) => {
                                 const pcm16Buffer = Buffer.from(pcm16Base64, 'base64');
 
                                 // Convert to μ-law 8kHz for Twilio
-                                const mulawBuffer = AudioConverter.pcm16_24kHzToMulaw(pcm16Buffer);
+                                // Assuming 16kHz input -> 16kHz output from Gemini
+                                const mulawBuffer = AudioConverter.pcm16_16kHzToMulaw(pcm16Buffer);
 
                                 // Send to Twilio
                                 if (streamSid) {
