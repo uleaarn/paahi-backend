@@ -439,10 +439,11 @@ fastify.register(async (fastify) => {
                                 // Extract PCM16 data (Base64)
                                 const pcm16Base64 = part.inlineData.data;
                                 const pcm16Buffer = Buffer.from(pcm16Base64, 'base64');
+                                console.log(`🔊 Received audio chunk from Gemini (${pcm16Buffer.length} bytes)`);
 
                                 // Convert to μ-law 8kHz for Twilio
-                                // Assuming 16kHz input -> 16kHz output from Gemini
-                                const mulawBuffer = AudioConverter.pcm16_16kHzToMulaw(pcm16Buffer);
+                                // Reverting to 24kHz -> 8kHz as that is the standard Gemini output rate
+                                const mulawBuffer = AudioConverter.pcm16_24kHzToMulaw(pcm16Buffer);
 
                                 // Send to Twilio
                                 if (streamSid) {
@@ -453,6 +454,9 @@ fastify.register(async (fastify) => {
                                             payload: mulawBuffer.toString('base64')
                                         }
                                     }));
+                                    console.log(`📤 Sent audio chunk to Twilio (${mulawBuffer.length} bytes)`);
+                                } else {
+                                    console.warn('⚠️ No streamSid, dropping audio chunk');
                                 }
                             }
                         }
