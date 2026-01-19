@@ -166,6 +166,10 @@ class OrderManager {
 
         console.log('📤 Submitting order to n8n:', JSON.stringify(this.currentOrder, null, 2));
 
+        if (this.currentOrder.items.length === 0) {
+            console.warn('⚠️ WARNING: Submitting an order with 0 items.');
+        }
+
         try {
             const response = await fetch(N8N_WEBHOOK_URL, {
                 method: 'POST',
@@ -299,16 +303,18 @@ fastify.register(async (fastify) => {
                                     }
                                 }
 
-                                // 2. Tool Call Handling (Bidi uses 'call' key)
-                                if (part.call) {
-                                    console.log('🛠️ Gemini ToolCall:', part.call.name);
-                                    const { name, args, id } = part.call;
+                                // 2. Tool Call Handling (Bidi uses 'call' or 'functionCall')
+                                const call = part.call || part.functionCall;
+                                if (call) {
+                                    console.log('🛠️ Gemini ToolCall:', call.name);
+                                    console.log('📦 Tool Args:', JSON.stringify(call.args, null, 2));
+                                    const { name, args, id } = call;
 
                                     if (name === 'submit_order') {
                                         const result = await orderManager.submitOrder(args);
                                         geminiWs.send(JSON.stringify({
-                                            toolResponse: {
-                                                functionResponses: [{ id, name, response: { result } }]
+                                            tool_response: {
+                                                function_responses: [{ id, name, response: { result } }]
                                             }
                                         }));
                                         console.log('📤 Sent tool response back to Gemini');
