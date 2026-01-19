@@ -444,8 +444,9 @@ fastify.register(async (fastify) => {
                                 console.log(`🔊 Received audio chunk from Gemini (${pcm16Buffer.length} bytes, RMS: ${rms.toFixed(2)})`);
 
                                 // Convert to μ-law 8kHz for Twilio
-                                // restored 16kHz -> 8kHz as Gemini likely mirrors input rate (16kHz)
-                                const mulawBuffer = AudioConverter.pcm16_16kHzToMulaw(pcm16Buffer);
+                                // Gemini 2.0 Flash output is fixed at 24kHz. 
+                                // Treating it as 16kHz was causing slow/pitched-down audio.
+                                const mulawBuffer = AudioConverter.pcm16_24kHzToMulaw(pcm16Buffer);
 
                                 // Send to Twilio
                                 if (streamSid) {
