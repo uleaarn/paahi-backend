@@ -280,6 +280,12 @@ fastify.register(async (fastify) => {
                 try {
                     const response = JSON.parse(data.toString());
 
+                    // RAWPAYLOAD LOGGING (DEBUG)
+                    if (!response.serverContent?.modelTurn?.parts?.some(p => p.inlineData)) {
+                        // Log non-audio responses for debugging
+                        console.log('📡 Gemini MSG:', JSON.stringify(response, null, 2));
+                    }
+
                     if (response.serverContent) {
                         const { modelTurn, turnComplete, interrupted } = response.serverContent;
 
