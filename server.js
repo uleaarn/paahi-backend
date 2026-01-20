@@ -215,20 +215,20 @@ fastify.register(async (fastify) => {
                 const setupMessage = {
                     setup: {
                         model: "models/gemini-2.0-flash-exp",
-                        generationConfig: {
-                            responseModalities: ["AUDIO", "TEXT"],
-                            speechConfig: {
-                                voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } }
+                        generation_config: {
+                            response_modalities: ["AUDIO"],
+                            speech_config: {
+                                voice_config: { prebuilt_voice_config: { voice_name: "Aoede" } }
                             }
                         },
-                        systemInstruction: {
+                        system_instruction: {
                             parts: [
                                 { text: `Current Server Time: ${currentTime}\n\n${systemInstructions}\n\n## Menu Data\n${JSON.stringify(menu, null, 2)}` }
                             ]
                         },
                         tools: [
                             {
-                                functionDeclarations: [
+                                function_declarations: [
                                     {
                                         name: "submit_order",
                                         description: "CRITICAL: Call this to save the order to the database. Use this after State 7 is complete and you have the user's Name and Phone.",
@@ -280,22 +280,25 @@ fastify.register(async (fastify) => {
                 try {
                     const response = JSON.parse(data.toString());
 
-                    // RAWPAYLOAD LOGGING (DEBUG)
-                    if (!response.serverContent?.modelTurn?.parts?.some(p => p.inlineData)) {
-                        // Log non-audio responses for debugging
+                    // LOGGING (DEBUG - Show keys to diagnose protocol changes)
+                    if (!response.serverContent?.modelTurn?.parts?.some(p => p.inlineData) &&
+                        !response.server_content?.model_turn?.parts?.some(p => p.inlineData)) {
                         console.log('📡 Gemini MSG:', JSON.stringify(response, null, 2));
                     }
 
-                    if (response.serverContent) {
-                        const { modelTurn, turnComplete, interrupted } = response.serverContent;
+                    const serverContent = response.serverContent || response.server_content;
+                    if (serverContent) {
+                        const { modelTurn, turnComplete, interrupted, model_turn, turn_complete } = serverContent;
+                        const turn = modelTurn || model_turn;
+                        const isComplete = turnComplete || turn_complete;
 
                         if (interrupted && streamSid) {
                             console.log('⚠️ Gemini Interrupted - Clearing Twilio Buffer');
                             connection.send(JSON.stringify({ event: 'clear', streamSid }));
                         }
 
-                        if (modelTurn && modelTurn.parts) {
-                            for (const part of modelTurn.parts) {
+                        if (turn && turn.parts) {
+                            for (const part of turn.parts) {
                                 // 1. Audio Handling
                                 if (part.inlineData && part.inlineData.mimeType.startsWith('audio/pcm')) {
                                     const pcm16Buffer = Buffer.from(part.inlineData.data, 'base64');
@@ -309,8 +312,8 @@ fastify.register(async (fastify) => {
                                     }
                                 }
 
-                                // 2. Tool Call Handling (Bidi uses 'call' or 'functionCall')
-                                const call = part.call || part.functionCall;
+                                // 2. Tool Call Handling (Support both 'call' and 'functionCall')
+                                const call = part.call || part.functionCall || part.function_call;
                                 if (call) {
                                     console.log('🛠️ Gemini ToolCall:', call.name);
                                     console.log('📦 Tool Args:', JSON.stringify(call.args, null, 2));
@@ -329,7 +332,7 @@ fastify.register(async (fastify) => {
                             }
                         }
 
-                        if (turnComplete) console.log('🏁 Gemini TurnComplete');
+                        if (isComplete) console.log('🏁 Gemini TurnComplete');
                     }
                 } catch (err) {
                     console.error('❌ Gemini Msg Error:', err);
