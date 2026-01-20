@@ -216,7 +216,7 @@ fastify.register(async (fastify) => {
                     setup: {
                         model: "models/gemini-2.0-flash-exp",
                         generationConfig: {
-                            responseModalities: ["AUDIO"],
+                            responseModalities: ["AUDIO", "TEXT"],
                             speechConfig: {
                                 voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } }
                             }
@@ -231,7 +231,7 @@ fastify.register(async (fastify) => {
                                 functionDeclarations: [
                                     {
                                         name: "submit_order",
-                                        description: "Finalize and submit the order. Arguments MUST contain all items and customer info.",
+                                        description: "CRITICAL: Call this to save the order to the database. Use this after State 7 is complete and you have the user's Name and Phone.",
                                         parameters: {
                                             type: "OBJECT",
                                             properties: {
