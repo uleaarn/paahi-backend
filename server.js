@@ -231,7 +231,7 @@ fastify.register(async (fastify) => {
                                 function_declarations: [
                                     {
                                         name: "submit_order",
-                                        description: "CRITICAL: Call this to save the order to the database. Use this after State 7 is complete and you have the user's Name and Phone.",
+                                        description: "MANDATORY: Call this immediately after the user provides their name and phone number. This tool call is the only way to save the order to the database. DO NOT finalize the conversation until this tool call returns success.",
                                         parameters: {
                                             type: "OBJECT",
                                             properties: {
@@ -254,10 +254,11 @@ fastify.register(async (fastify) => {
                                                         name: { type: "STRING" },
                                                         phone: { type: "STRING" },
                                                         address: { type: "STRING" }
-                                                    }
+                                                    },
+                                                    required: ["name", "phone"]
                                                 }
                                             },
-                                            required: ["items"]
+                                            required: ["items", "customerInfo"]
                                         }
                                     }
                                 ]
