@@ -216,7 +216,7 @@ fastify.register(async (fastify) => {
                     setup: {
                         model: "models/gemini-2.0-flash-exp",
                         generation_config: {
-                            response_modalities: ["AUDIO"],
+                            response_modalities: ["AUDIO", "TEXT"],
                             speech_config: {
                                 voice_config: { prebuilt_voice_config: { voice_name: "Aoede" } }
                             }
@@ -231,7 +231,7 @@ fastify.register(async (fastify) => {
                                 function_declarations: [
                                     {
                                         name: "submit_order",
-                                        description: "MANDATORY: Call this immediately after the user provides their name and phone number. This tool call is the only way to save the order to the database. DO NOT finalize the conversation until this tool call returns success.",
+                                        description: "MANDATORY: Call this immediately after the user provides their name and phone number. This tool call is the only way to save the order to the database. DO NOT finalize the conversation until this tool call returns success. Structure the items correctly with price and quantity.",
                                         parameters: {
                                             type: "OBJECT",
                                             properties: {
@@ -266,6 +266,8 @@ fastify.register(async (fastify) => {
                         ]
                     }
                 };
+
+                console.log('📤 Sending Setup:', JSON.stringify(setupMessage, null, 2).substring(0, 1000) + '...');
                 geminiWs.send(JSON.stringify(setupMessage));
 
                 const greetingMessage = {
@@ -281,12 +283,6 @@ fastify.register(async (fastify) => {
                 try {
                     const response = JSON.parse(data.toString());
 
-                    // LOGGING (DEBUG - Show keys to diagnose protocol changes)
-                    if (!response.serverContent?.modelTurn?.parts?.some(p => p.inlineData) &&
-                        !response.server_content?.model_turn?.parts?.some(p => p.inlineData)) {
-                        console.log('📡 Gemini MSG:', JSON.stringify(response, null, 2));
-                    }
-
                     const serverContent = response.serverContent || response.server_content;
                     if (serverContent) {
                         const { modelTurn, turnComplete, interrupted, model_turn, turn_complete } = serverContent;
@@ -300,9 +296,15 @@ fastify.register(async (fastify) => {
 
                         if (turn && turn.parts) {
                             for (const part of turn.parts) {
+                                // DIAGNOSTIC: Log parts that aren't pure audio
+                                if (!part.inlineData && !part.inline_data) {
+                                    console.log('📦 Gemini Part:', JSON.stringify(part, null, 2));
+                                }
+
                                 // 1. Audio Handling
-                                if (part.inlineData && part.inlineData.mimeType.startsWith('audio/pcm')) {
-                                    const pcm16Buffer = Buffer.from(part.inlineData.data, 'base64');
+                                const inlineData = part.inlineData || part.inline_data;
+                                if (inlineData && inlineData.mimeType.startsWith('audio/pcm')) {
+                                    const pcm16Buffer = Buffer.from(inlineData.data, 'base64');
                                     const mulawBuffer = AudioConverter.pcm16_24kHzToMulaw(pcm16Buffer);
                                     if (streamSid) {
                                         connection.send(JSON.stringify({
@@ -313,7 +315,12 @@ fastify.register(async (fastify) => {
                                     }
                                 }
 
-                                // 2. Tool Call Handling (Support both 'call' and 'functionCall')
+                                // 1b. Text/Transcript Handling (If TEXT modality enabled)
+                                if (part.text) {
+                                    console.log('💬 Gemini Text:', part.text);
+                                }
+
+                                // 2. Tool Call Handling
                                 const call = part.call || part.functionCall || part.function_call;
                                 if (call) {
                                     console.log('🛠️ Gemini ToolCall:', call.name);
