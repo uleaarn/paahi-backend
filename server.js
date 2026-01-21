@@ -217,7 +217,7 @@ fastify.register(async (fastify) => {
                 const currentTime = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
                 const setupMessage = {
                     setup: {
-                        model: "models/gemini-2.0-flash",
+                        model: "models/gemini-2.0-flash-exp",
                         generation_config: {
                             response_modalities: ["AUDIO", "TEXT"],
                             speech_config: {
