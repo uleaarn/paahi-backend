@@ -360,7 +360,8 @@ fastify.register(async (fastify) => {
                 console.log(`🤖 Gemini closed: ${code} - ${reason}`);
 
                 // Check for quota error
-                if (reason && reason.toLowerCase().includes('quota')) {
+                const reasonStr = reason ? reason.toString() : '';
+                if (reasonStr.toLowerCase().includes('quota')) {
                     console.error('🛑 QUOTA EXCEEDED: Please check your Google AI Studio quota or status.');
                 }
 
