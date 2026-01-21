@@ -45,9 +45,9 @@ await fastify.register(FastifyFormBody);
 
 // Audio conversion utilities
 class AudioConverter {
-    static mulawToPCM16_16kHz(mulawBuffer) {
+    static mulawToPCM16_24kHz(mulawBuffer) {
         const pcm16_8kHz = this.decodeMulaw(mulawBuffer);
-        return this.resample(pcm16_8kHz, 8000, 16000);
+        return this.resample(pcm16_8kHz, 8000, 24000);
     }
 
     static pcm16_24kHzToMulaw(pcm16Buffer) {
@@ -200,6 +200,9 @@ fastify.register(async (fastify) => {
 
         let streamSid = null;
         let geminiWs = null;
+        let retryCount = 0;
+        const MAX_RETRIES = 5;
+        const INITIAL_RETRY_DELAY = 2000; // 2 seconds
         const orderManager = new OrderManager();
 
         const connectToGemini = () => {
@@ -233,27 +236,27 @@ fastify.register(async (fastify) => {
                                         name: "submit_order",
                                         description: "MANDATORY: Call this immediately after the user provides their name and phone number. This tool call is the only way to save the order to the database. DO NOT finalize the conversation until this tool call returns success. Structure the items correctly with price and quantity.",
                                         parameters: {
-                                            type: "OBJECT",
+                                            type: "object",
                                             properties: {
                                                 items: {
-                                                    type: "ARRAY",
+                                                    type: "array",
                                                     items: {
-                                                        type: "OBJECT",
+                                                        type: "object",
                                                         properties: {
-                                                            name: { type: "STRING" },
-                                                            quantity: { type: "INTEGER" },
-                                                            price: { type: "NUMBER" },
-                                                            modifiers: { type: "ARRAY", items: { type: "STRING" } }
+                                                            name: { type: "string" },
+                                                            quantity: { type: "integer" },
+                                                            price: { type: "number" },
+                                                            modifiers: { type: "array", items: { type: "string" } }
                                                         },
                                                         required: ["name", "quantity"]
                                                     }
                                                 },
                                                 customerInfo: {
-                                                    type: "OBJECT",
+                                                    type: "object",
                                                     properties: {
-                                                        name: { type: "STRING" },
-                                                        phone: { type: "STRING" },
-                                                        address: { type: "STRING" }
+                                                        name: { type: "string" },
+                                                        phone: { type: "string" },
+                                                        address: { type: "string" }
                                                     },
                                                     required: ["name", "phone"]
                                                 }
@@ -269,19 +272,24 @@ fastify.register(async (fastify) => {
 
                 console.log('📤 Sending Setup:', JSON.stringify(setupMessage, null, 2).substring(0, 1000) + '...');
                 geminiWs.send(JSON.stringify(setupMessage));
-
-                const greetingMessage = {
-                    client_content: {
-                        turns: [{ role: "user", parts: [{ text: "Start the conversation by greeting the customer warmly." }] }],
-                        turn_complete: true
-                    }
-                };
-                geminiWs.send(JSON.stringify(greetingMessage));
             });
 
             geminiWs.on('message', async (data) => {
                 try {
                     const response = JSON.parse(data.toString());
+
+                    const setupComplete = response.setupComplete || response.setup_complete;
+                    if (setupComplete) {
+                        console.log('✅ Received SetupComplete from Gemini');
+                        const greetingMessage = {
+                            client_content: {
+                                turns: [{ role: "user", parts: [{ text: "Start the conversation by greeting the customer warmly." }] }],
+                                turn_complete: true
+                            }
+                        };
+                        geminiWs.send(JSON.stringify(greetingMessage));
+                        return;
+                    }
 
                     const serverContent = response.serverContent || response.server_content;
                     if (serverContent) {
@@ -350,10 +358,22 @@ fastify.register(async (fastify) => {
             geminiWs.on('error', (err) => console.error('❌ Gemini WS Error:', err));
             geminiWs.on('close', (code, reason) => {
                 console.log(`🤖 Gemini closed: ${code} - ${reason}`);
-                // Attempt to reconnect if stream is still active
+
+                // Check for quota error
+                if (reason && reason.toLowerCase().includes('quota')) {
+                    console.error('🛑 QUOTA EXCEEDED: Please check your Google AI Studio quota or status.');
+                }
+
+                // Attempt to reconnect if stream is still active and retries remain
                 if (streamSid) {
-                    console.log('🔄 Attempting to reconnect to Gemini...');
-                    setTimeout(connectToGemini, 1000);
+                    if (retryCount < MAX_RETRIES) {
+                        const delay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
+                        retryCount++;
+                        console.log(`🔄 Attempting to reconnect (Attempt ${retryCount}/${MAX_RETRIES}) in ${delay}ms...`);
+                        setTimeout(connectToGemini, delay);
+                    } else {
+                        console.error('❌ Max retries reached. Stopping Gemini reconnection.');
+                    }
                 }
             });
         };
@@ -373,7 +393,7 @@ fastify.register(async (fastify) => {
                     case 'media':
                         if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
                             const mulawBuffer = Buffer.from(msg.media.payload, 'base64');
-                            const pcm16Buffer = AudioConverter.mulawToPCM16_16kHz(mulawBuffer);
+                            const pcm16Buffer = AudioConverter.mulawToPCM16_24kHz(mulawBuffer);
                             const audioMessage = {
                                 realtime_input: {
                                     media_chunks: [{ mime_type: "audio/pcm", data: pcm16Buffer.toString('base64') }]
