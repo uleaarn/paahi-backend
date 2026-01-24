@@ -4,10 +4,14 @@ import FastifyFormBody from '@fastify/formbody';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@deepgram/sdk';
 import { ElevenLabsClient, stream } from "elevenlabs";
+import WebSocket from 'ws';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+// Polyfill WebSocket for Deepgram SDK
+globalThis.WebSocket = WebSocket;
 
 dotenv.config();
 
@@ -49,6 +53,42 @@ const elevenlabs = new ElevenLabsClient({ apiKey: ELEVENLABS_API_KEY });
 
 // Store ElevenLabs voice ID globally
 let ELEVENLABS_VOICE_ID = null;
+
+// Deepgram WebSocket diagnostic probe
+async function probeDeepgramWebSocket() {
+    console.log('\n🔍 Probing Deepgram WebSocket connection...');
+    const url = `wss://api.deepgram.com/v1/listen?model=nova-2&language=en-US&smart_format=true&encoding=mulaw&sample_rate=8000&channels=1`;
+
+    const ws = new WebSocket(url, {
+        headers: { Authorization: `Token ${DEEPGRAM_API_KEY}` },
+    });
+
+    return new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+            ws.close();
+            resolve({ status: 'timeout', message: 'Connection timeout after 5s' });
+        }, 5000);
+
+        ws.on('open', () => {
+            clearTimeout(timeout);
+            console.log('✅ Deepgram WS probe: Connection opened successfully');
+            ws.close();
+            resolve({ status: 'ok', message: 'Connection successful' });
+        });
+
+        ws.on('unexpected-response', (_, res) => {
+            clearTimeout(timeout);
+            console.error(`❌ Deepgram WS probe: Unexpected response - Status ${res.statusCode} ${res.statusMessage}`);
+            resolve({ status: 'error', statusCode: res.statusCode, message: res.statusMessage });
+        });
+
+        ws.on('error', (e) => {
+            clearTimeout(timeout);
+            console.error('❌ Deepgram WS probe: Error -', e.message);
+            resolve({ status: 'error', message: e.message });
+        });
+    });
+}
 
 // Health check functions
 async function checkDeepgramHealth() {
@@ -132,6 +172,12 @@ async function runStartupHealthChecks() {
         console.log('✅ All API keys are valid and working!\n');
     } else {
         console.error('❌ Some API keys are invalid. Check the errors above.\n');
+    }
+
+    // Run Deepgram WebSocket probe
+    const probeResult = await probeDeepgramWebSocket();
+    if (probeResult.status !== 'ok') {
+        console.error(`❌ Deepgram WebSocket probe failed:`, probeResult);
     }
 
     return results;
@@ -250,7 +296,7 @@ class VoiceSession {
                 model: 'nova-2',
                 language: 'en-US',
                 smart_format: true,
-                encoding: 'linear16',
+                encoding: 'mulaw',  // Changed from linear16 to match Twilio's audio format
                 sample_rate: 8000,
                 channels: 1,
                 interim_results: false,
