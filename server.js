@@ -356,25 +356,49 @@ class VoiceSession {
     async synthesizeAndSend(text) {
         try {
             console.log(`🔊 Synthesizing: "${text.substring(0, 50)}..."`);
-
-            // Generate audio with ElevenLabs
-            const audioStream = await elevenlabs.generate({
-                voice: ELEVENLABS_VOICE_ID || "21m00Tcm4TlvDq8ikWAM", // You can change this to other voices
-                text: text,
-                model_id: "eleven_turbo_v2_5",
-                output_format: "pcm_8000"
-            });
-
-            // Collect audio chunks
-            const audioChunks = [];
-            for await (const chunk of audioStream) {
-                audioChunks.push(chunk);
+            if (!ELEVENLABS_VOICE_ID) {
+                console.error('❌ No ElevenLabs voice ID available');
+                return;
             }
 
-            const pcm16Audio = Buffer.concat(audioChunks);
+            // Use REST API instead of SDK to avoid 401 errors
+            const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
+                method: 'POST',
+                headers: {
+                    'xi-api-key': ELEVENLABS_API_KEY,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    text: text,
+                    model_id: "eleven_turbo_v2_5",
+                    voice_settings: {
+                        stability: 0.5,
+                        similarity_boost: 0.75
+                    },
+                    output_format: "pcm_16000" // ElevenLabs doesn't support pcm_8000, we'll resample
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`❌ ElevenLabs API error: ${response.status} - ${errorText}`);
+                return;
+            }
+
+            // Get audio data as buffer
+            const arrayBuffer = await response.arrayBuffer();
+            const pcm16Audio = Buffer.from(arrayBuffer);
+
+            console.log(`✅ Received ${pcm16Audio.length} bytes of PCM16 audio`);
+
+            // Resample from 16kHz to 8kHz (simple decimation - take every other sample)
+            const pcm8Audio = Buffer.alloc(pcm16Audio.length / 2);
+            for (let i = 0; i < pcm8Audio.length; i += 2) {
+                pcm8Audio.writeInt16LE(pcm16Audio.readInt16LE(i * 2), i);
+            }
 
             // Convert PCM16 to mulaw for Twilio
-            const mulawAudio = AudioConverter.pcm16ToMulaw(pcm16Audio);
+            const mulawAudio = AudioConverter.pcm16ToMulaw(pcm8Audio);
 
             // Send to Twilio in chunks
             const CHUNK_SIZE = 640; // 20ms of mulaw audio at 8kHz
