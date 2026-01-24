@@ -393,7 +393,7 @@ class VoiceSession {
 
             // Resample from 16kHz to 8kHz (simple decimation - take every 2nd sample)
             const out = Buffer.alloc(pcm16Audio.length / 2); // half the samples
-            for (let o = 0, i = 0; o < out.length; o += 2, i += 4) {
+            for (let o = 0, i = 0; o < out.length - 1 && i < pcm16Audio.length - 1; o += 2, i += 4) {
                 out.writeInt16LE(pcm16Audio.readInt16LE(i), o); // take every 2nd sample
             }
             const pcm8Audio = out;
