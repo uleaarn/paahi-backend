@@ -47,6 +47,86 @@ const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 const deepgram = createClient(DEEPGRAM_API_KEY);
 const elevenlabs = new ElevenLabsClient({ apiKey: ELEVENLABS_API_KEY });
 
+// Health check functions
+async function checkDeepgramHealth() {
+    try {
+        const response = await fetch('https://api.deepgram.com/v1/projects', {
+            headers: {
+                'Authorization': `Token ${DEEPGRAM_API_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            console.log('✅ Deepgram API key is valid');
+            return { status: 'ok', service: 'Deepgram' };
+        } else {
+            const text = await response.text();
+            console.error(`❌ Deepgram API key invalid: ${response.status} ${response.statusText}`);
+            console.error(`Response: ${text.substring(0, 200)}`);
+            return { status: 'error', service: 'Deepgram', error: `${response.status}: ${text.substring(0, 200)}` };
+        }
+    } catch (error) {
+        console.error(`❌ Deepgram health check failed:`, error.message);
+        return { status: 'error', service: 'Deepgram', error: error.message };
+    }
+}
+
+async function checkElevenLabsHealth() {
+    try {
+        const response = await fetch('https://api.elevenlabs.io/v1/voices', {
+            headers: {
+                'xi-api-key': ELEVENLABS_API_KEY,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            console.log('✅ ElevenLabs API key is valid');
+            return { status: 'ok', service: 'ElevenLabs' };
+        } else {
+            const text = await response.text();
+            console.error(`❌ ElevenLabs API key invalid: ${response.status} ${response.statusText}`);
+            console.error(`Response: ${text.substring(0, 200)}`);
+            return { status: 'error', service: 'ElevenLabs', error: `${response.status}: ${text.substring(0, 200)}` };
+        }
+    } catch (error) {
+        console.error(`❌ ElevenLabs health check failed:`, error.message);
+        return { status: 'error', service: 'ElevenLabs', error: error.message };
+    }
+}
+
+async function checkGeminiHealth() {
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+        const result = await model.generateContent("test");
+        console.log('✅ Gemini API key is valid');
+        return { status: 'ok', service: 'Gemini' };
+    } catch (error) {
+        console.error(`❌ Gemini API key invalid:`, error.message);
+        return { status: 'error', service: 'Gemini', error: error.message };
+    }
+}
+
+// Run health checks on startup
+async function runStartupHealthChecks() {
+    console.log('\n🔍 Running API health checks...');
+    const results = await Promise.all([
+        checkDeepgramHealth(),
+        checkElevenLabsHealth(),
+        checkGeminiHealth()
+    ]);
+
+    const allOk = results.every(r => r.status === 'ok');
+    if (allOk) {
+        console.log('✅ All API keys are valid and working!\n');
+    } else {
+        console.error('❌ Some API keys are invalid. Check the errors above.\n');
+    }
+
+    return results;
+}
+
 // Initialize Fastify
 const fastify = Fastify({ logger: true });
 await fastify.register(FastifyWebSocket);
@@ -342,6 +422,22 @@ fastify.get('/', async (request, reply) => {
     return { status: 'ok', message: 'Jalwa Voice Agent - Hybrid Pipeline' };
 });
 
+fastify.get('/health', async (request, reply) => {
+    const results = await Promise.all([
+        checkDeepgramHealth(),
+        checkElevenLabsHealth(),
+        checkGeminiHealth()
+    ]);
+
+    const allOk = results.every(r => r.status === 'ok');
+
+    return {
+        status: allOk ? 'healthy' : 'unhealthy',
+        timestamp: new Date().toISOString(),
+        services: results
+    };
+});
+
 fastify.post('/twiml', async (request, reply) => {
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -405,10 +501,13 @@ fastify.register(async (fastify) => {
 });
 
 // Start server
-fastify.listen({ port: PORT, host: '0.0.0.0' }, (err) => {
+fastify.listen({ port: PORT, host: '0.0.0.0' }, async (err) => {
     if (err) {
         console.error(err);
         process.exit(1);
     }
     console.log(`🚀 Server running on port ${PORT}`);
+
+    // Run health checks after server starts
+    await runStartupHealthChecks();
 });
