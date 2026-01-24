@@ -391,11 +391,12 @@ class VoiceSession {
 
             console.log(`✅ Received ${pcm16Audio.length} bytes of PCM16 audio`);
 
-            // Resample from 16kHz to 8kHz (simple decimation - take every other sample)
-            const pcm8Audio = Buffer.alloc(pcm16Audio.length / 2);
-            for (let i = 0; i < pcm8Audio.length; i += 2) {
-                pcm8Audio.writeInt16LE(pcm16Audio.readInt16LE(i * 2), i);
+            // Resample from 16kHz to 8kHz (simple decimation - take every 2nd sample)
+            const out = Buffer.alloc(pcm16Audio.length / 2); // half the samples
+            for (let o = 0, i = 0; o < out.length; o += 2, i += 4) {
+                out.writeInt16LE(pcm16Audio.readInt16LE(i), o); // take every 2nd sample
             }
+            const pcm8Audio = out;
 
             // Convert PCM16 to mulaw for Twilio
             const mulawAudio = AudioConverter.pcm16ToMulaw(pcm8Audio);
@@ -535,13 +536,13 @@ fastify.register(async (fastify) => {
 });
 
 // Start server
-fastify.listen({ port: PORT, host: '0.0.0.0' }, async (err) => {
-    if (err) {
-        console.error(err);
+(async () => {
+    try {
+        await fastify.listen({ port: PORT, host: '0.0.0.0' });
+        console.log(`🚀 Server running on port ${PORT}`);
+        await runStartupHealthChecks();
+    } catch (err) {
+        fastify.log.error(err);
         process.exit(1);
     }
-    console.log(`🚀 Server running on port ${PORT}`);
-
-    // Run health checks after server starts
-    await runStartupHealthChecks();
-});
+})();
