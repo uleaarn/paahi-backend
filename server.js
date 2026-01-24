@@ -47,6 +47,9 @@ const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 const deepgram = createClient(DEEPGRAM_API_KEY);
 const elevenlabs = new ElevenLabsClient({ apiKey: ELEVENLABS_API_KEY });
 
+// Store ElevenLabs voice ID globally
+let ELEVENLABS_VOICE_ID = null;
+
 // Health check functions
 async function checkDeepgramHealth() {
     try {
@@ -82,7 +85,14 @@ async function checkElevenLabsHealth() {
         });
 
         if (response.ok) {
-            console.log('✅ ElevenLabs API key is valid');
+            const voicesJson = await response.json();
+            const firstVoice = voicesJson?.voices?.[0];
+            if (firstVoice) {
+                ELEVENLABS_VOICE_ID = firstVoice.voice_id;
+                console.log(`✅ ElevenLabs API key is valid (voice: ${firstVoice.name}, ID: ${ELEVENLABS_VOICE_ID})`);
+            } else {
+                console.log("✅ ElevenLabs API key is valid (no voices available)");
+            }
             return { status: 'ok', service: 'ElevenLabs' };
         } else {
             const text = await response.text();
@@ -349,10 +359,10 @@ class VoiceSession {
 
             // Generate audio with ElevenLabs
             const audioStream = await elevenlabs.generate({
-                voice: "Rachel", // You can change this to other voices
+                voice: ELEVENLABS_VOICE_ID || "21m00Tcm4TlvDq8ikWAM", // You can change this to other voices
                 text: text,
                 model_id: "eleven_turbo_v2_5",
-                output_format: "pcm_16000"
+                output_format: "pcm_8000"
             });
 
             // Collect audio chunks
