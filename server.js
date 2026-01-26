@@ -234,9 +234,11 @@ class AudioConverter {
     }
 
     static pcm16ToMulaw(pcm16Buffer) {
-        const mulawBuffer = Buffer.alloc(pcm16Buffer.length / 2);
+        // Ensure we only process complete 16-bit samples (even number of bytes)
+        const validLength = pcm16Buffer.length - (pcm16Buffer.length % 2);
+        const mulawBuffer = Buffer.alloc(validLength / 2);
 
-        for (let i = 0; i < pcm16Buffer.length; i += 2) {
+        for (let i = 0; i < validLength; i += 2) {
             let sample = pcm16Buffer.readInt16LE(i);
 
             // Clamp to 16-bit range
