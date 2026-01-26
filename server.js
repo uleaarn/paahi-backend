@@ -522,9 +522,21 @@ class VoiceSession {
     // Queue-based audio player
     enqueueMulaw(mulawAudio) {
         const CHUNK_SIZE = 160;
+
+        // Split into 160-byte frames
         for (let i = 0; i < mulawAudio.length; i += CHUNK_SIZE) {
-            this.outboundQueue.push(mulawAudio.slice(i, i + CHUNK_SIZE));
+            let frame = mulawAudio.slice(i, i + CHUNK_SIZE);
+
+            // CRITICAL: Pad last frame to exactly 160 bytes with μ-law silence (0xFF)
+            if (frame.length < CHUNK_SIZE) {
+                const paddedFrame = Buffer.alloc(CHUNK_SIZE, 0xFF); // μ-law silence
+                frame.copy(paddedFrame);
+                frame = paddedFrame;
+            }
+
+            this.outboundQueue.push(frame);
         }
+
         if (!this.isPlaying) this.startPlayer();
     }
 
