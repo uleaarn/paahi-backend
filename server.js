@@ -9,6 +9,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import mulaw from 'alawmulaw';
 // Polyfill WebSocket for Deepgram SDK
 globalThis.WebSocket = WebSocket;
 
