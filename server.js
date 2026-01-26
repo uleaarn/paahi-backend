@@ -236,8 +236,10 @@ class AudioConverter {
 
     static pcm16ToMulaw(pcm16Buffer) {
         // Use proven alawmulaw library for correct ITU-T G.711 μ-law encoding
-        // This library handles all the complex encoding details correctly
-        return mulaw.encode(pcm16Buffer);
+        // Convert Buffer to Int16Array for the library
+        const int16Array = new Int16Array(pcm16Buffer.buffer, pcm16Buffer.byteOffset, pcm16Buffer.length / 2);
+        const mulawUint8 = mulaw.mulaw.encode(int16Array);
+        return Buffer.from(mulawUint8);
     }
 }
 
