@@ -4,6 +4,7 @@ import FastifyFormBody from '@fastify/formbody';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@deepgram/sdk';
 import { ElevenLabsClient, stream } from "elevenlabs";
+import textToSpeech from '@google-cloud/text-to-speech';
 import WebSocket from 'ws';
 import dotenv from 'dotenv';
 import fs from 'fs';
@@ -420,42 +421,34 @@ class VoiceSession {
                 return;
             }
 
-            // Get PCM16 at 8kHz from ElevenLabs
-            const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
-                method: 'POST',
-                headers: {
-                    'xi-api-key': ELEVENLABS_API_KEY,
-                    'Content-Type': 'application/json'
+            // 🎯 Google Cloud TTS - Returns clean LINEAR16 PCM @ 8kHz
+            const ttsClient = new textToSpeech.TextToSpeechClient();
+
+            const request = {
+                input: { text },
+                voice: {
+                    languageCode: 'en-US',
+                    name: 'en-US-Neural2-D', // Natural-sounding voice
                 },
-                body: JSON.stringify({
-                    text: text,
-                    model_id: "eleven_turbo_v2_5",
-                    voice_settings: {
-                        stability: 0.5,
-                        similarity_boost: 0.75
-                    },
-                    output_format: "mp3_22050_32" // pcm_8000 returns MP3+ID3! Use MP3, decode, resample
-                })
-            });
+                audioConfig: {
+                    audioEncoding: 'LINEAR16',
+                    sampleRateHertz: 8000,
+                    speakingRate: 1.0,
+                    pitch: 0.0,
+                },
+            };
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error(`❌ ElevenLabs API error: ${response.status} - ${errorText}`);
-                return;
-            }
+            const [response] = await ttsClient.synthesizeSpeech(request);
 
-            const pcm16Buffer = Buffer.from(await response.arrayBuffer());
+            // Get clean PCM16 buffer (no ID3 tags, no MP3 encoding!)
+            const pcm16Buffer = Buffer.isBuffer(response.audioContent)
+                ? response.audioContent
+                : Buffer.from(response.audioContent, 'base64');
 
-            // 🔍 CRITICAL: Check for unexpected headers (ID3, RIFF, WAVE)
-            const first16Bytes = pcm16Buffer.slice(0, Math.min(16, pcm16Buffer.length));
-            console.log(`� First 16 bytes (hex): ${first16Bytes.toString('hex')}`);
-            console.log(`🔍 First 4 bytes (ASCII): ${first16Bytes.slice(0, 4).toString('ascii')}`);
-
-            // Detect and strip WAV header if present
-            if (pcm16Buffer.length >= 4 && pcm16Buffer.toString('ascii', 0, 4) === 'RIFF') {
-                console.warn(`⚠️ WAV HEADER DETECTED! Stripping 44-byte header...`);
-                // WAV headers not expected for pcm_8000, but log if found
-            }
+            console.log(`✅ Google TTS: Clean LINEAR16 PCM @ 8kHz`);
+            console.log(`   - Size: ${pcm16Buffer.length} bytes`);
+            console.log(`   - No ID3 tags, no MP3 encoding`);
+            console.log(`   - Ready for μ-law conversion`);
 
             // AUDIO DIAGNOSTICS
             const sampleRate = 8000;
