@@ -434,7 +434,7 @@ class VoiceSession {
                         stability: 0.5,
                         similarity_boost: 0.75
                     },
-                    output_format: "pcm_8000" // Get PCM16 at 8kHz, we'll convert to μ-law
+                    output_format: "ulaw_8000" // Native μ-law from ElevenLabs - bypass our conversion
                 })
             });
 
@@ -444,37 +444,34 @@ class VoiceSession {
                 return;
             }
 
-            const pcm16Buffer = Buffer.from(await response.arrayBuffer());
+            let mulawBuffer = Buffer.from(await response.arrayBuffer());
+
+            // 🔍 CRITICAL: Check for WAV header (RIFF/WAVE)
+            const first16Bytes = mulawBuffer.slice(0, Math.min(16, mulawBuffer.length));
+            console.log(`� First 16 bytes (hex): ${first16Bytes.toString('hex')}`);
+            console.log(`🔍 First 4 bytes (ASCII): ${first16Bytes.slice(0, 4).toString('ascii')}`);
+
+            // Detect and strip WAV header if present
+            if (mulawBuffer.length >= 4 && mulawBuffer.toString('ascii', 0, 4) === 'RIFF') {
+                console.warn(`⚠️ WAV HEADER DETECTED! Stripping 44-byte header...`);
+                mulawBuffer = mulawBuffer.slice(44); // Standard WAV header is 44 bytes
+            }
 
             // AUDIO DIAGNOSTICS
             const sampleRate = 8000;
             const channels = 1;
-            const bitDepth = 16;
-            const bytesPerSample = bitDepth / 8;
-            const totalSamples = pcm16Buffer.length / bytesPerSample;
-            const durationMs = (totalSamples / sampleRate) * 1000;
-
-            console.log(`📦 PCM16 Audio Received:`);
-            console.log(`   - Size: ${pcm16Buffer.length} bytes`);
-            console.log(`   - Sample Rate: ${sampleRate} Hz`);
-            console.log(`   - Channels: ${channels} (mono)`);
-            console.log(`   - Bit Depth: ${bitDepth}-bit`);
-            console.log(`   - Samples: ${totalSamples}`);
-            console.log(`   - Duration: ${durationMs.toFixed(0)}ms`);
-            console.log(`   - Bytes/Sample: ${bytesPerSample}`);
-
-            // Convert PCM16 to μ-law for Twilio
-            const mulawBuffer = AudioConverter.pcm16ToMulaw(pcm16Buffer);
-
-            // μ-LAW DIAGNOSTICS
-            const expectedMulawSize = Math.floor(pcm16Buffer.length / 2);
             const frameSizeBytes = 160; // Twilio expects 160 bytes per 20ms frame
+            const totalSamples = mulawBuffer.length; // μ-law is 1 byte per sample
+            const durationMs = (totalSamples / sampleRate) * 1000;
             const totalFrames = Math.ceil(mulawBuffer.length / frameSizeBytes);
 
-            console.log(`🔄 μ-law Conversion:`);
-            console.log(`   - Converted Size: ${mulawBuffer.length} bytes`);
-            console.log(`   - Expected Size: ${expectedMulawSize} bytes`);
-            console.log(`   - Match: ${mulawBuffer.length === expectedMulawSize ? '✅' : '❌'}`);
+            console.log(`� μ-law Audio Received (NATIVE from ElevenLabs):`);
+            console.log(`   - Size: ${mulawBuffer.length} bytes`);
+            console.log(`   - Sample Rate: ${sampleRate} Hz`);
+            console.log(`   - Channels: ${channels} (mono)`);
+            console.log(`   - Encoding: μ-law (8-bit)`);
+            console.log(`   - Samples: ${totalSamples}`);
+            console.log(`   - Duration: ${durationMs.toFixed(0)}ms`);
             console.log(`   - Frame Size: ${frameSizeBytes} bytes (20ms @ 8kHz)`);
             console.log(`   - Total Frames: ${totalFrames}`);
             console.log(`   - Last Frame Size: ${mulawBuffer.length % frameSizeBytes || frameSizeBytes} bytes`);
