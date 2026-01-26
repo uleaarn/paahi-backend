@@ -9,7 +9,6 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-
 // Polyfill WebSocket for Deepgram SDK
 globalThis.WebSocket = WebSocket;
 
@@ -235,39 +234,35 @@ class AudioConverter {
     }
 
     static pcm16ToMulaw(pcm16Buffer) {
-        const BIAS = 0x84;
-        const CLIP = 32635;
-        const encodeTable = [
-            0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3,
-            4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
-            6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
-            6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
-            6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
-            7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-            7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-            7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-            7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-            7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-            7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-            7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-            7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7
-        ];
-
         const mulawBuffer = Buffer.alloc(pcm16Buffer.length / 2);
+
         for (let i = 0; i < pcm16Buffer.length; i += 2) {
             let sample = pcm16Buffer.readInt16LE(i);
-            const sign = (sample >> 8) & 0x80;
+
+            // Clamp to 16-bit range
+            if (sample > 32767) sample = 32767;
+            if (sample < -32768) sample = -32768;
+
+            // Get sign bit
+            const sign = sample < 0 ? 0x80 : 0x00;
             if (sign) sample = -sample;
-            if (sample > CLIP) sample = CLIP;
-            sample += BIAS;
-            const exponent = encodeTable[(sample >> 7) & 0xFF];
-            const mantissa = (sample >> (exponent + 3)) & 0x0F;
-            const mulaw = ~(sign | (exponent << 4) | mantissa);
-            mulawBuffer[i / 2] = mulaw & 0xFF;
+
+            // Find exponent by shifting until value is under 0x3f
+            let exponent = 0;
+            let magnitude = sample >> 2; // Bias is 4, so shift by 2
+            while (magnitude > 0x3f) {
+                magnitude >>= 1;
+                exponent++;
+            }
+
+            // Mantissa is lower 4 bits
+            const mantissa = magnitude & 0x0f;
+
+            // Combine and invert
+            const ulawByte = ~(sign | (exponent << 4) | mantissa) & 0xFF;
+            mulawBuffer[i / 2] = ulawByte;
         }
+
         return mulawBuffer;
     }
 }
@@ -286,6 +281,12 @@ class VoiceSession {
         this.lastTranscript = '';
         this.silenceTimer = null;
 
+        // Outbound audio queue
+        this.outboundQueue = [];
+        this.isPlaying = false;
+        this.playTimer = null;
+        this.currentStreamAbort = false;
+
         console.log(`🎙️ New session: ${streamSid}`);
         this.initializeDeepgram();
     }
@@ -296,10 +297,9 @@ class VoiceSession {
                 model: 'nova-2',
                 language: 'en-US',
                 smart_format: true,
-                encoding: 'mulaw',  // Changed from linear16 to match Twilio's audio format
+                encoding: 'mulaw',
                 sample_rate: 8000,
                 channels: 1,
-                interim_results: false,
                 endpointing: 300,
                 utterance_end_ms: 1000
             });
@@ -309,9 +309,15 @@ class VoiceSession {
             });
 
             this.deepgramConnection.on('Results', async (data) => {
-                const transcript = data.channel?.alternatives?.[0]?.transcript;
+                const alt = data.channel?.alternatives?.[0];
+                const transcript = alt?.transcript;
+
+                // ✅ Only process FINAL results
+                const isFinal = data.is_final === true || data.speech_final === true;
+                if (!isFinal) return;
+
                 if (transcript && transcript.trim()) {
-                    console.log(`📝 Transcript: "${transcript}"`);
+                    console.log(`📝 FINAL: "${transcript}"`);
                     this.lastTranscript = transcript;
 
                     // Process the transcript with Gemini
@@ -407,7 +413,7 @@ class VoiceSession {
                 return;
             }
 
-            // Use REST API instead of SDK to avoid 401 errors
+            // 1) Fetch MP3 from ElevenLabs
             const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
                 method: 'POST',
                 headers: {
@@ -421,7 +427,7 @@ class VoiceSession {
                         stability: 0.5,
                         similarity_boost: 0.75
                     },
-                    output_format: "pcm_16000" // ElevenLabs doesn't support pcm_8000, we'll resample
+                    output_format: "ulaw_8000" // Get μ-law directly from ElevenLabs
                 })
             });
 
@@ -431,51 +437,76 @@ class VoiceSession {
                 return;
             }
 
-            // Get audio data as buffer
-            const arrayBuffer = await response.arrayBuffer();
-            const pcm16Audio = Buffer.from(arrayBuffer);
+            const ulawBuffer = Buffer.from(await response.arrayBuffer());
+            console.log(`📦 Received ${ulawBuffer.length} bytes of ulaw_8000`);
 
-            console.log(`✅ Received ${pcm16Audio.length} bytes of PCM16 audio`);
-
-            // Resample from 16kHz to 8kHz (simple decimation - take every 2nd sample)
-            const out = Buffer.alloc(pcm16Audio.length / 2); // half the samples
-            for (let o = 0, i = 0; o < out.length - 1 && i < pcm16Audio.length - 1; o += 2, i += 4) {
-                out.writeInt16LE(pcm16Audio.readInt16LE(i), o); // take every 2nd sample
-            }
-            const pcm8Audio = out;
-
-            // Convert PCM16 to mulaw for Twilio
-            const mulawAudio = AudioConverter.pcm16ToMulaw(pcm8Audio);
-
-            // Send to Twilio in chunks
-            const CHUNK_SIZE = 640; // 20ms of mulaw audio at 8kHz
-            for (let i = 0; i < mulawAudio.length; i += CHUNK_SIZE) {
-                const chunk = mulawAudio.slice(i, i + CHUNK_SIZE);
-                const payload = {
-                    event: 'media',
-                    streamSid: this.streamSid,
-                    media: {
-                        payload: chunk.toString('base64')
-                    }
-                };
-                this.connection.send(JSON.stringify(payload));
-            }
-
-            console.log(`✅ Audio sent to caller`);
+            // Enqueue directly - it's already μ-law 8kHz
+            this.enqueueMulaw(ulawBuffer);
 
         } catch (error) {
             console.error(`❌ TTS error:`, error);
         }
     }
 
+    // Queue-based audio player
+    enqueueMulaw(mulawAudio) {
+        const CHUNK_SIZE = 160;
+        for (let i = 0; i < mulawAudio.length; i += CHUNK_SIZE) {
+            this.outboundQueue.push(mulawAudio.slice(i, i + CHUNK_SIZE));
+        }
+        if (!this.isPlaying) this.startPlayer();
+    }
+
+    startPlayer() {
+        const FRAME_INTERVAL_MS = 20;
+        this.isPlaying = true;
+        this.currentStreamAbort = false;
+
+        console.log(`⏱️ Player started. Queue frames: ${this.outboundQueue.length}`);
+
+        this.playTimer = setInterval(() => {
+            if (this.currentStreamAbort) {
+                console.log("🛑 Player aborted (barge-in). Clearing queue.");
+                this.outboundQueue = [];
+                this.currentStreamAbort = false;
+            }
+
+            if (this.outboundQueue.length === 0) {
+                clearInterval(this.playTimer);
+                this.playTimer = null;
+                this.isPlaying = false;
+                console.log("✅ Player stopped (queue empty).");
+                return;
+            }
+
+            const frame = this.outboundQueue.shift();
+
+            // STRICT payload
+            this.connection.send(JSON.stringify({
+                event: "media",
+                streamSid: this.streamSid,
+                media: { payload: frame.toString("base64") }
+            }));
+        }, FRAME_INTERVAL_MS);
+    }
+
+    stopPlaybackForBargeIn() {
+        // Call this when user starts speaking
+        if (this.isPlaying) {
+            this.currentStreamAbort = true;
+        }
+    }
+
     processAudio(audioPayload) {
         try {
             const mulawBuffer = Buffer.from(audioPayload, 'base64');
-            const pcm16Buffer = AudioConverter.mulawToPCM16(mulawBuffer);
 
-            // Send to Deepgram
+            // Barge-in: if caller is speaking, stop TTS playback
+            this.stopPlaybackForBargeIn();
+
+            // Send μ-law directly to Deepgram (it's configured for mulaw encoding)
             if (this.deepgramConnection && this.deepgramConnection.getReadyState() === 1) {
-                this.deepgramConnection.send(pcm16Buffer);
+                this.deepgramConnection.send(mulawBuffer);
             }
 
         } catch (error) {
@@ -523,7 +554,7 @@ fastify.post('/twiml', async (request, reply) => {
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Connect>
-        <Stream url="wss://${request.headers.host}/media-stream" />
+        <Stream url="wss://${request.headers.host}/media-stream" track="both_tracks" />
     </Connect>
 </Response>`;
 
