@@ -502,9 +502,6 @@ class VoiceSession {
         try {
             const mulawBuffer = Buffer.from(audioPayload, 'base64');
 
-            // Barge-in: if caller is speaking, stop TTS playback
-            this.stopPlaybackForBargeIn();
-
             // Send μ-law directly to Deepgram (it's configured for mulaw encoding)
             if (this.deepgramConnection && this.deepgramConnection.getReadyState() === 1) {
                 this.deepgramConnection.send(mulawBuffer);
