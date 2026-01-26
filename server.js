@@ -16,6 +16,14 @@ globalThis.WebSocket = WebSocket;
 
 dotenv.config();
 
+// 🔐 Google Cloud Credentials Setup (for Railway deployment)
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+    const credsPath = '/tmp/google-credentials.json';
+    fs.writeFileSync(credsPath, process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = credsPath;
+    console.log('✅ Google Cloud credentials loaded from environment variable');
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
