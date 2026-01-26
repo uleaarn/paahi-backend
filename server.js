@@ -466,11 +466,39 @@ class VoiceSession {
             }
 
             const pcm16Buffer = Buffer.from(await response.arrayBuffer());
-            console.log(`📦 Received ${pcm16Buffer.length} bytes of PCM16`);
+
+            // AUDIO DIAGNOSTICS
+            const sampleRate = 8000;
+            const channels = 1;
+            const bitDepth = 16;
+            const bytesPerSample = bitDepth / 8;
+            const totalSamples = pcm16Buffer.length / bytesPerSample;
+            const durationMs = (totalSamples / sampleRate) * 1000;
+
+            console.log(`📦 PCM16 Audio Received:`);
+            console.log(`   - Size: ${pcm16Buffer.length} bytes`);
+            console.log(`   - Sample Rate: ${sampleRate} Hz`);
+            console.log(`   - Channels: ${channels} (mono)`);
+            console.log(`   - Bit Depth: ${bitDepth}-bit`);
+            console.log(`   - Samples: ${totalSamples}`);
+            console.log(`   - Duration: ${durationMs.toFixed(0)}ms`);
+            console.log(`   - Bytes/Sample: ${bytesPerSample}`);
 
             // Convert PCM16 to μ-law for Twilio
             const mulawBuffer = AudioConverter.pcm16ToMulaw(pcm16Buffer);
-            console.log(`🔄 Converted to ${mulawBuffer.length} bytes of μ-law`);
+
+            // μ-LAW DIAGNOSTICS
+            const expectedMulawSize = Math.floor(pcm16Buffer.length / 2);
+            const frameSizeBytes = 160; // Twilio expects 160 bytes per 20ms frame
+            const totalFrames = Math.ceil(mulawBuffer.length / frameSizeBytes);
+
+            console.log(`🔄 μ-law Conversion:`);
+            console.log(`   - Converted Size: ${mulawBuffer.length} bytes`);
+            console.log(`   - Expected Size: ${expectedMulawSize} bytes`);
+            console.log(`   - Match: ${mulawBuffer.length === expectedMulawSize ? '✅' : '❌'}`);
+            console.log(`   - Frame Size: ${frameSizeBytes} bytes (20ms @ 8kHz)`);
+            console.log(`   - Total Frames: ${totalFrames}`);
+            console.log(`   - Last Frame Size: ${mulawBuffer.length % frameSizeBytes || frameSizeBytes} bytes`);
 
             // Enqueue the μ-law audio
             this.enqueueMulaw(mulawBuffer);
