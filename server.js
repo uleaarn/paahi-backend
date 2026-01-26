@@ -300,6 +300,7 @@ class VoiceSession {
                 encoding: 'mulaw',
                 sample_rate: 8000,
                 channels: 1,
+                interim_results: true,  // Required for utterance_end_ms
                 endpointing: 300,
                 utterance_end_ms: 1000
             });
