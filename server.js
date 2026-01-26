@@ -238,30 +238,36 @@ class AudioConverter {
         const validLength = pcm16Buffer.length - (pcm16Buffer.length % 2);
         const mulawBuffer = Buffer.alloc(validLength / 2);
 
+        // μ-law encoding constants (ITU-T G.711)
+        const MULAW_BIAS = 33; // Standard μ-law bias (0x21)
+        const MULAW_MAX = 0x1FFF; // Maximum value after bias
+
         for (let i = 0; i < validLength; i += 2) {
             let sample = pcm16Buffer.readInt16LE(i);
 
-            // Clamp to 16-bit range
-            if (sample > 32767) sample = 32767;
-            if (sample < -32768) sample = -32768;
-
-            // Get sign bit
-            const sign = sample < 0 ? 0x80 : 0x00;
+            // Get sign and work with absolute value
+            const sign = (sample < 0) ? 0x80 : 0x00;
             if (sign) sample = -sample;
 
-            // Find exponent by shifting until value is under 0x3f
-            let exponent = 0;
-            let magnitude = sample >> 2; // Bias is 4, so shift by 2
-            while (magnitude > 0x3f) {
-                magnitude >>= 1;
-                exponent++;
+            // Add bias and clamp
+            sample = sample + MULAW_BIAS;
+            if (sample > MULAW_MAX) sample = MULAW_MAX;
+
+            // Find segment (exponent)
+            let segment = 0;
+            let mask = 0x1000;
+            for (segment = 0; segment < 8; segment++) {
+                if (sample & mask) break;
+                mask >>= 1;
             }
 
-            // Mantissa is lower 4 bits
-            const mantissa = magnitude & 0x0f;
+            // Extract mantissa (4 bits from the segment)
+            const mantissa = (sample >> (segment + 3)) & 0x0F;
 
-            // Combine and invert
-            const ulawByte = ~(sign | (exponent << 4) | mantissa) & 0xFF;
+            // Combine: sign (1 bit) | segment (3 bits) | mantissa (4 bits)
+            // Then invert all bits (μ-law standard)
+            const ulawByte = ~(sign | (segment << 4) | mantissa) & 0xFF;
+
             mulawBuffer[i / 2] = ulawByte;
         }
 
