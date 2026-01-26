@@ -300,6 +300,11 @@ class VoiceSession {
         this.cooldownUntil = 0;   // Timestamp to ignore transcripts until
         this.ttsStartTime = 0;    // When TTS started (to filter short greetings)
 
+        // Frame contract validation (Twilio outbound diagnostics)
+        this.frameSizes = [];
+        this.sendIntervals = [];
+        this.lastFrameSendTime = 0;
+
         console.log(`🎙️ New session: ${streamSid}`);
         this.initializeDeepgram();
     }
@@ -532,6 +537,11 @@ class VoiceSession {
         this.isSpeaking = true;
         console.log(`🔊 TTS PLAYBACK STARTED - STT GATED (isSpeaking=true)`);
 
+        // Reset frame contract diagnostics
+        this.frameSizes = [];
+        this.sendIntervals = [];
+        this.lastFrameSendTime = Date.now();
+
         console.log(`⏱️ Player started. Queue frames: ${this.outboundQueue.length}`);
 
         this.playTimer = setInterval(() => {
@@ -546,6 +556,26 @@ class VoiceSession {
                 this.playTimer = null;
                 this.isPlaying = false;
 
+                // FRAME CONTRACT DIAGNOSTICS
+                if (this.frameSizes.length > 0) {
+                    const avgFrameSize = this.frameSizes.reduce((a, b) => a + b, 0) / this.frameSizes.length;
+                    const minFrameSize = Math.min(...this.frameSizes);
+                    const maxFrameSize = Math.max(...this.frameSizes);
+                    const avgInterval = this.sendIntervals.length > 0
+                        ? this.sendIntervals.reduce((a, b) => a + b, 0) / this.sendIntervals.length
+                        : 0;
+                    const framesPerSecond = avgInterval > 0 ? 1000 / avgInterval : 0;
+
+                    console.log(`📊 FRAME CONTRACT VALIDATION:`);
+                    console.log(`   - Bytes/Frame: ${avgFrameSize.toFixed(1)} (expected: 160)`);
+                    console.log(`   - Min Frame Size: ${minFrameSize} bytes`);
+                    console.log(`   - Max Frame Size: ${maxFrameSize} bytes`);
+                    console.log(`   - Avg Send Interval: ${avgInterval.toFixed(1)}ms (expected: 20ms)`);
+                    console.log(`   - Frames/Second: ${framesPerSecond.toFixed(1)} (expected: 50)`);
+                    console.log(`   - Total Frames Sent: ${this.frameSizes.length}`);
+                    console.log(`   - Frame Size Variance: ${minFrameSize === maxFrameSize ? '✅ None' : '❌ Varies'}`);
+                }
+
                 // HARD GATE: Unblock STT with 250ms cooldown after TTS ends
                 this.isSpeaking = false;
                 this.cooldownUntil = Date.now() + 250;
@@ -555,6 +585,14 @@ class VoiceSession {
             }
 
             const frame = this.outboundQueue.shift();
+
+            // Track frame contract metrics
+            const now = Date.now();
+            this.frameSizes.push(frame.length);
+            if (this.lastFrameSendTime > 0) {
+                this.sendIntervals.push(now - this.lastFrameSendTime);
+            }
+            this.lastFrameSendTime = now;
 
             // STRICT payload
             this.connection.send(JSON.stringify({
