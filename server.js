@@ -446,7 +446,7 @@ class VoiceSession {
 
             const pcm16Buffer = Buffer.from(await response.arrayBuffer());
 
-            // 🔍 CRITICAL: Check for WAV header (RIFF/WAVE)
+            // 🔍 CRITICAL: Check for unexpected headers (ID3, RIFF, WAVE)
             const first16Bytes = pcm16Buffer.slice(0, Math.min(16, pcm16Buffer.length));
             console.log(`� First 16 bytes (hex): ${first16Bytes.toString('hex')}`);
             console.log(`🔍 First 4 bytes (ASCII): ${first16Bytes.slice(0, 4).toString('ascii')}`);
