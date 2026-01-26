@@ -452,9 +452,9 @@ class VoiceSession {
             console.log(`🔍 First 4 bytes (ASCII): ${first16Bytes.slice(0, 4).toString('ascii')}`);
 
             // Detect and strip WAV header if present
-            if (mulawBuffer.length >= 4 && mulawBuffer.toString('ascii', 0, 4) === 'RIFF') {
+            if (pcm16Buffer.length >= 4 && pcm16Buffer.toString('ascii', 0, 4) === 'RIFF') {
                 console.warn(`⚠️ WAV HEADER DETECTED! Stripping 44-byte header...`);
-                mulawBuffer = mulawBuffer.slice(44); // Standard WAV header is 44 bytes
+                // WAV headers not expected for pcm_8000, but log if found
             }
 
             // AUDIO DIAGNOSTICS
