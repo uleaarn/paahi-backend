@@ -289,6 +289,11 @@ class VoiceSession {
         this.playTimer = null;
         this.currentStreamAbort = false;
 
+        // STT gating to prevent self-transcription
+        this.isSpeaking = false;  // True when TTS is playing
+        this.cooldownUntil = 0;   // Timestamp to ignore transcripts until
+        this.ttsStartTime = 0;    // When TTS started (to filter short greetings)
+
         console.log(`🎙️ New session: ${streamSid}`);
         this.initializeDeepgram();
     }
@@ -342,6 +347,25 @@ class VoiceSession {
     }
 
     async processTranscript(transcript) {
+        const now = Date.now();
+
+        // HARD GATE: Block ALL transcripts during TTS playback + cooldown
+        if (this.isSpeaking || now < this.cooldownUntil) {
+            console.log(`🚫 STT GATED: isSpeaking=${this.isSpeaking}, cooldown=${now < this.cooldownUntil}, transcript="${transcript}"`);
+            return;
+        }
+
+        // Filter short greetings that arrive within 2s of TTS start (likely echo/noise)
+        const timeSinceTTS = now - this.ttsStartTime;
+        const isShortGreeting = /^(hello|hi|hey)[\?]?$/i.test(transcript.trim());
+        if (isShortGreeting && timeSinceTTS < 2000) {
+            console.log(`🚫 FILTERED SHORT GREETING: "${transcript}" (${timeSinceTTS}ms since TTS start)`);
+            return;
+        }
+
+        console.log(`✅ STT ACCEPTED: "${transcript}" (isSpeaking=${this.isSpeaking}, cooldownUntil=${this.cooldownUntil}, now=${now})`);
+        console.log(`📝 FINAL: "${transcript}"`);
+
         if (this.isProcessing) {
             console.log('⏳ Already processing, queuing...');
             return;
@@ -410,6 +434,7 @@ class VoiceSession {
 
     async synthesizeAndSend(text) {
         try {
+            this.ttsStartTime = Date.now(); // Track when TTS starts for greeting filter
             console.log(`🔊 Synthesizing: "${text.substring(0, 50)}..."`);
             if (!ELEVENLABS_VOICE_ID) {
                 console.error('❌ No ElevenLabs voice ID available');
@@ -469,6 +494,10 @@ class VoiceSession {
         this.isPlaying = true;
         this.currentStreamAbort = false;
 
+        // HARD GATE: Block STT during TTS playback
+        this.isSpeaking = true;
+        console.log(`🔊 TTS PLAYBACK STARTED - STT GATED (isSpeaking=true)`);
+
         console.log(`⏱️ Player started. Queue frames: ${this.outboundQueue.length}`);
 
         this.playTimer = setInterval(() => {
@@ -482,6 +511,11 @@ class VoiceSession {
                 clearInterval(this.playTimer);
                 this.playTimer = null;
                 this.isPlaying = false;
+
+                // HARD GATE: Unblock STT with 250ms cooldown after TTS ends
+                this.isSpeaking = false;
+                this.cooldownUntil = Date.now() + 250;
+                console.log(`🔇 TTS PLAYBACK ENDED - STT COOLDOWN 250ms (isSpeaking=false, cooldownUntil=${this.cooldownUntil})`);
                 console.log("✅ Player stopped (queue empty).");
                 return;
             }
