@@ -234,44 +234,9 @@ class AudioConverter {
     }
 
     static pcm16ToMulaw(pcm16Buffer) {
-        // Ensure we only process complete 16-bit samples (even number of bytes)
-        const validLength = pcm16Buffer.length - (pcm16Buffer.length % 2);
-        const mulawBuffer = Buffer.alloc(validLength / 2);
-
-        // μ-law encoding constants (ITU-T G.711)
-        const MULAW_BIAS = 33; // Standard μ-law bias (0x21)
-        const MULAW_MAX = 0x1FFF; // Maximum value after bias
-
-        for (let i = 0; i < validLength; i += 2) {
-            let sample = pcm16Buffer.readInt16LE(i);
-
-            // Get sign and work with absolute value
-            const sign = (sample < 0) ? 0x80 : 0x00;
-            if (sign) sample = -sample;
-
-            // Add bias and clamp
-            sample = sample + MULAW_BIAS;
-            if (sample > MULAW_MAX) sample = MULAW_MAX;
-
-            // Find segment (exponent)
-            let segment = 0;
-            let mask = 0x1000;
-            for (segment = 0; segment < 8; segment++) {
-                if (sample & mask) break;
-                mask >>= 1;
-            }
-
-            // Extract mantissa (4 bits from the segment)
-            const mantissa = (sample >> (segment + 3)) & 0x0F;
-
-            // Combine: sign (1 bit) | segment (3 bits) | mantissa (4 bits)
-            // Then invert all bits (μ-law standard)
-            const ulawByte = ~(sign | (segment << 4) | mantissa) & 0xFF;
-
-            mulawBuffer[i / 2] = ulawByte;
-        }
-
-        return mulawBuffer;
+        // Use proven alawmulaw library for correct ITU-T G.711 μ-law encoding
+        // This library handles all the complex encoding details correctly
+        return mulaw.encode(pcm16Buffer);
     }
 }
 
