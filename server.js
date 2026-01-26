@@ -414,7 +414,7 @@ class VoiceSession {
                 return;
             }
 
-            // 1) Fetch MP3 from ElevenLabs
+            // Get PCM16 at 8kHz from ElevenLabs
             const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
                 method: 'POST',
                 headers: {
@@ -428,7 +428,7 @@ class VoiceSession {
                         stability: 0.5,
                         similarity_boost: 0.75
                     },
-                    output_format: "ulaw_8000" // Get μ-law directly from ElevenLabs
+                    output_format: "pcm_8000" // Get PCM16 at 8kHz, we'll convert to μ-law
                 })
             });
 
@@ -438,11 +438,15 @@ class VoiceSession {
                 return;
             }
 
-            const ulawBuffer = Buffer.from(await response.arrayBuffer());
-            console.log(`📦 Received ${ulawBuffer.length} bytes of ulaw_8000`);
+            const pcm16Buffer = Buffer.from(await response.arrayBuffer());
+            console.log(`📦 Received ${pcm16Buffer.length} bytes of PCM16`);
 
-            // Enqueue directly - it's already μ-law 8kHz
-            this.enqueueMulaw(ulawBuffer);
+            // Convert PCM16 to μ-law for Twilio
+            const mulawBuffer = AudioConverter.pcm16ToMulaw(pcm16Buffer);
+            console.log(`🔄 Converted to ${mulawBuffer.length} bytes of μ-law`);
+
+            // Enqueue the μ-law audio
+            this.enqueueMulaw(mulawBuffer);
 
         } catch (error) {
             console.error(`❌ TTS error:`, error);
