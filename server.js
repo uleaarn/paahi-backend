@@ -559,7 +559,7 @@ fastify.post('/twiml', async (request, reply) => {
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Connect>
-        <Stream url="${wsUrl}" />
+        <Stream url="${wsUrl}" track="inbound_track" />
     </Connect>
 </Response>`;
 
