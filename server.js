@@ -551,13 +551,17 @@ fastify.get('/health', async (request, reply) => {
 });
 
 fastify.post('/twiml', async (request, reply) => {
+    const wsUrl = `wss://${request.headers.host}/media-stream`;
+    console.log(`📞 Incoming call - WebSocket URL: ${wsUrl}`);
+
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Connect>
-        <Stream url="wss://${request.headers.host}/media-stream" track="both_tracks" />
+        <Stream url="${wsUrl}" />
     </Connect>
 </Response>`;
 
+    console.log(`📤 TwiML Response: ${twimlResponse}`);
     reply.type('text/xml').send(twimlResponse);
 });
 
