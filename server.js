@@ -434,7 +434,7 @@ class VoiceSession {
                         stability: 0.5,
                         similarity_boost: 0.75
                     },
-                    output_format: "ulaw_8000" // Native μ-law from ElevenLabs - bypass our conversion
+                    output_format: "pcm_8000" // Get raw PCM16 - ulaw_8000 returns MP3 with ID3 tags!
                 })
             });
 
