@@ -444,7 +444,7 @@ class VoiceSession {
                 return;
             }
 
-            let mulawBuffer = Buffer.from(await response.arrayBuffer());
+            const pcm16Buffer = Buffer.from(await response.arrayBuffer());
 
             // 🔍 CRITICAL: Check for WAV header (RIFF/WAVE)
             const first16Bytes = mulawBuffer.slice(0, Math.min(16, mulawBuffer.length));
@@ -460,18 +460,31 @@ class VoiceSession {
             // AUDIO DIAGNOSTICS
             const sampleRate = 8000;
             const channels = 1;
-            const frameSizeBytes = 160; // Twilio expects 160 bytes per 20ms frame
-            const totalSamples = mulawBuffer.length; // μ-law is 1 byte per sample
+            const bitDepth = 16;
+            const bytesPerSample = bitDepth / 8;
+            const totalSamples = pcm16Buffer.length / bytesPerSample;
             const durationMs = (totalSamples / sampleRate) * 1000;
-            const totalFrames = Math.ceil(mulawBuffer.length / frameSizeBytes);
 
-            console.log(`� μ-law Audio Received (NATIVE from ElevenLabs):`);
-            console.log(`   - Size: ${mulawBuffer.length} bytes`);
+            console.log(`📦 PCM16 Audio Received:`);
+            console.log(`   - Size: ${pcm16Buffer.length} bytes`);
             console.log(`   - Sample Rate: ${sampleRate} Hz`);
             console.log(`   - Channels: ${channels} (mono)`);
-            console.log(`   - Encoding: μ-law (8-bit)`);
+            console.log(`   - Bit Depth: ${bitDepth}-bit`);
             console.log(`   - Samples: ${totalSamples}`);
             console.log(`   - Duration: ${durationMs.toFixed(0)}ms`);
+
+            // Convert PCM16 to μ-law using proven alawmulaw library
+            const mulawBuffer = AudioConverter.pcm16ToMulaw(pcm16Buffer);
+
+            // μ-LAW CONVERSION DIAGNOSTICS
+            const expectedMulawSize = Math.floor(pcm16Buffer.length / 2);
+            const frameSizeBytes = 160; // Twilio expects 160 bytes per 20ms frame
+            const totalFrames = Math.ceil(mulawBuffer.length / frameSizeBytes);
+
+            console.log(`🔄 μ-law Conversion (alawmulaw library):`);
+            console.log(`   - Converted Size: ${mulawBuffer.length} bytes`);
+            console.log(`   - Expected Size: ${expectedMulawSize} bytes`);
+            console.log(`   - Match: ${mulawBuffer.length === expectedMulawSize ? '✅' : '❌'}`);
             console.log(`   - Frame Size: ${frameSizeBytes} bytes (20ms @ 8kHz)`);
             console.log(`   - Total Frames: ${totalFrames}`);
             console.log(`   - Last Frame Size: ${mulawBuffer.length % frameSizeBytes || frameSizeBytes} bytes`);
