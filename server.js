@@ -31,12 +31,12 @@ const __dirname = path.dirname(__filename);
 const PORT = process.env.PORT || 3000;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY;
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
-const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY; // Optional, using Google TTS now
 
-if (!GEMINI_API_KEY || !DEEPGRAM_API_KEY || !ELEVENLABS_API_KEY) {
+if (!GEMINI_API_KEY || !DEEPGRAM_API_KEY) {
     console.error('❌ Missing required API keys');
-    console.error('Required: GEMINI_API_KEY, DEEPGRAM_API_KEY, ELEVENLABS_API_KEY');
+    console.error('Required: GEMINI_API_KEY, DEEPGRAM_API_KEY');
+    console.error('Optional: ELEVENLABS_API_KEY (using Google Cloud TTS by default)');
     process.exit(1);
 }
 
