@@ -434,7 +434,7 @@ class VoiceSession {
                         stability: 0.5,
                         similarity_boost: 0.75
                     },
-                    output_format: "pcm_8000" // Get raw PCM16 - ulaw_8000 returns MP3 with ID3 tags!
+                    output_format: "mp3_22050_32" // pcm_8000 returns MP3+ID3! Use MP3, decode, resample
                 })
             });
 
