@@ -157,7 +157,7 @@ async function checkElevenLabsHealth() {
 
 async function checkGeminiHealth() {
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const result = await model.generateContent("test");
         console.log('✅ Gemini API key is valid');
         return { status: 'ok', service: 'Gemini' };
@@ -245,8 +245,9 @@ class AudioConverter {
 
     static pcm16ToMulaw(pcm16Buffer) {
         // Use proven alawmulaw library for correct ITU-T G.711 μ-law encoding
-        // Convert Buffer to Int16Array for the library
-        const int16Array = new Int16Array(pcm16Buffer.buffer, pcm16Buffer.byteOffset, pcm16Buffer.length / 2);
+        // Create a properly aligned copy to avoid "start offset must be multiple of 2" error
+        const alignedBuffer = Buffer.from(pcm16Buffer);
+        const int16Array = new Int16Array(alignedBuffer.buffer, alignedBuffer.byteOffset, alignedBuffer.length / 2);
         const mulawUint8 = mulaw.mulaw.encode(int16Array);
         return Buffer.from(mulawUint8);
     }
@@ -397,7 +398,7 @@ class VoiceSession {
             const fullInstructions = `Current Server Time: ${currentTime}\n\n${systemInstructions}`;
 
             const model = genAI.getGenerativeModel({
-                model: "gemini-2.0-flash-exp",
+                model: "gemini-1.5-flash",
                 systemInstruction: fullInstructions
             });
 
