@@ -157,7 +157,7 @@ async function checkElevenLabsHealth() {
 
 async function checkGeminiHealth() {
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
         const result = await model.generateContent("test");
         console.log('✅ Gemini API key is valid');
         return { status: 'ok', service: 'Gemini' };
@@ -398,7 +398,7 @@ class VoiceSession {
             const fullInstructions = `Current Server Time: ${currentTime}\n\n${systemInstructions}`;
 
             const model = genAI.getGenerativeModel({
-                model: "gemini-1.5-flash",
+                model: "gemini-1.5-flash-latest",
                 systemInstruction: fullInstructions
             });
 
