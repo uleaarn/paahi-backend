@@ -32,11 +32,13 @@ const PORT = process.env.PORT || 3000;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY;
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY; // Optional, using Google TTS now
+const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
 
 if (!OPENAI_API_KEY || !DEEPGRAM_API_KEY) {
     console.error('❌ Missing required API keys');
     console.error('Required: OPENAI_API_KEY, DEEPGRAM_API_KEY');
     console.error('Optional: ELEVENLABS_API_KEY (using Google Cloud TTS by default)');
+    console.error('Optional: N8N_WEBHOOK_URL (for order submission)');
     process.exit(1);
 }
 
@@ -259,6 +261,40 @@ class AudioConverter {
     }
 }
 
+// n8n Order Submission
+async function submitOrderToN8n(orderData) {
+    if (!N8N_WEBHOOK_URL) {
+        console.log('⚠️ N8N_WEBHOOK_URL not configured, skipping order submission');
+        return { success: false, error: 'No webhook URL configured' };
+    }
+
+    try {
+        console.log('📤 Submitting order to n8n:', JSON.stringify(orderData, null, 2));
+
+        const response = await fetch(N8N_WEBHOOK_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(orderData)
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            console.log('✅ Order submitted to n8n successfully:', result);
+            return { success: true, data: result };
+        } else {
+            const errorText = await response.text();
+            console.error(`❌ n8n webhook error: ${response.status} ${response.statusText}`);
+            console.error(`Response: ${errorText}`);
+            return { success: false, error: `${response.status}: ${errorText}` };
+        }
+    } catch (error) {
+        console.error('❌ Failed to submit order to n8n:', error.message);
+        return { success: false, error: error.message };
+    }
+}
+
 // Session management
 const sessions = new Map();
 
@@ -283,6 +319,16 @@ class VoiceSession {
         this.isSpeaking = false;  // True when TTS is playing
         this.cooldownUntil = 0;   // Timestamp to ignore transcripts until
         this.ttsStartTime = 0;    // When TTS started (to filter short greetings)
+
+        // Order tracking
+        this.orderData = {
+            items: [],
+            customer_name: null,
+            customer_phone: null,
+            total: 0,
+            status: 'in_progress'
+        };
+        this.orderSubmitted = false;
 
         // Frame contract validation (Twilio outbound diagnostics)
         this.frameSizes = [];
@@ -387,6 +433,9 @@ class VoiceSession {
                     parts: [{ text: response }]
                 });
 
+                // Check if order is complete and submit to n8n
+                await this.checkAndSubmitOrder(response);
+
                 // Convert response to speech and send to caller
                 await this.synthesizeAndSend(response);
             }
@@ -424,6 +473,59 @@ class VoiceSession {
         } catch (error) {
             console.error(`❌ OpenAI error:`, error);
             return "I apologize, I'm having trouble processing that. Could you please repeat?";
+        }
+    }
+
+    async checkAndSubmitOrder(aiResponse) {
+        // Don't submit if already submitted
+        if (this.orderSubmitted) return;
+
+        // Parse AI response for order completion signals
+        const lowerResponse = aiResponse.toLowerCase();
+
+        // Check if this looks like an order confirmation or completion
+        const isOrderComplete = (
+            (lowerResponse.includes('your order') || lowerResponse.includes('your total')) &&
+            (lowerResponse.includes('thank you') || lowerResponse.includes('confirmed') ||
+                lowerResponse.includes('placed') || lowerResponse.includes('submitted'))
+        ) || (
+                lowerResponse.includes('order has been') &&
+                (lowerResponse.includes('placed') || lowerResponse.includes('confirmed'))
+            );
+
+        // Extract order details from conversation history
+        if (isOrderComplete) {
+            console.log('🎯 Order completion detected, extracting order details...');
+
+            // Parse conversation for order items, name, and phone
+            const conversationText = this.conversationHistory
+                .map(msg => msg.parts[0].text)
+                .join(' ');
+
+            // Extract customer info from conversation
+            const nameMatch = conversationText.match(/(?:name|called?)\s+(?:is\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i);
+            const phoneMatch = conversationText.match(/(\d{3}[-.\s]?\d{3}[-.\s]?\d{4}|\d{10})/);
+
+            // Build order data
+            const orderData = {
+                customer_name: nameMatch ? nameMatch[1] : 'Unknown',
+                customer_phone: phoneMatch ? phoneMatch[1].replace(/[-.\s]/g, '') : 'Unknown',
+                items: aiResponse, // Full AI response contains order summary
+                order_summary: aiResponse,
+                timestamp: new Date().toISOString(),
+                source: 'voice_call',
+                conversation_history: this.conversationHistory
+            };
+
+            // Submit to n8n
+            const result = await submitOrderToN8n(orderData);
+
+            if (result.success) {
+                this.orderSubmitted = true;
+                console.log('✅ Order successfully submitted and saved to database');
+            } else {
+                console.error('❌ Order submission failed:', result.error);
+            }
         }
     }
 
