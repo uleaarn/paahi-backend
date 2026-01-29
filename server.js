@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import FastifyWebSocket from '@fastify/websocket';
 import FastifyFormBody from '@fastify/formbody';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { createClient } from '@deepgram/sdk';
 import { ElevenLabsClient, stream } from "elevenlabs";
 import textToSpeech from '@google-cloud/text-to-speech';
@@ -29,13 +29,13 @@ const __dirname = path.dirname(__filename);
 
 // Configuration
 const PORT = process.env.PORT || 3000;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY;
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY; // Optional, using Google TTS now
 
-if (!GEMINI_API_KEY || !DEEPGRAM_API_KEY) {
+if (!OPENAI_API_KEY || !DEEPGRAM_API_KEY) {
     console.error('❌ Missing required API keys');
-    console.error('Required: GEMINI_API_KEY, DEEPGRAM_API_KEY');
+    console.error('Required: OPENAI_API_KEY, DEEPGRAM_API_KEY');
     console.error('Optional: ELEVENLABS_API_KEY (using Google Cloud TTS by default)');
     process.exit(1);
 }
@@ -56,7 +56,7 @@ try {
 }
 
 // Initialize AI clients
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 const deepgram = createClient(DEEPGRAM_API_KEY);
 const elevenlabs = new ElevenLabsClient({ apiKey: ELEVENLABS_API_KEY });
 
@@ -155,15 +155,18 @@ async function checkElevenLabsHealth() {
     }
 }
 
-async function checkGeminiHealth() {
+async function checkOpenAIHealth() {
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
-        const result = await model.generateContent("test");
-        console.log('✅ Gemini API key is valid');
-        return { status: 'ok', service: 'Gemini' };
+        const response = await openai.chat.completions.create({
+            model: "gpt-4-turbo-preview",
+            messages: [{ role: "user", content: "test" }],
+            max_tokens: 5
+        });
+        console.log('✅ OpenAI API key is valid');
+        return { status: 'ok', service: 'OpenAI' };
     } catch (error) {
-        console.error(`❌ Gemini API key invalid:`, error.message);
-        return { status: 'error', service: 'Gemini', error: error.message };
+        console.error(`❌ OpenAI API key invalid:`, error.message);
+        return { status: 'error', service: 'OpenAI', error: error.message };
     }
 }
 
@@ -173,7 +176,7 @@ async function runStartupHealthChecks() {
     const results = await Promise.all([
         checkDeepgramHealth(),
         checkElevenLabsHealth(),
-        checkGeminiHealth()
+        checkOpenAIHealth()
     ]);
 
     const allOk = results.every(r => r.status === 'ok');
@@ -317,7 +320,7 @@ class VoiceSession {
                     console.log(`📝 FINAL: "${transcript}"`);
                     this.lastTranscript = transcript;
 
-                    // Process the transcript with Gemini
+                    // Process the transcript with OpenAI
                     await this.processTranscript(transcript);
                 }
             });
@@ -369,11 +372,11 @@ class VoiceSession {
                 parts: [{ text: transcript }]
             });
 
-            // Get response from Gemini
-            const response = await this.getGeminiResponse();
+            // Get response from OpenAI
+            const response = await this.getOpenAIResponse();
 
             if (response) {
-                console.log(`🤖 Gemini: "${response}"`);
+                console.log(`🤖 OpenAI: "${response}"`);
 
                 // Add assistant response to history
                 this.conversationHistory.push({
@@ -392,31 +395,31 @@ class VoiceSession {
         }
     }
 
-    async getGeminiResponse() {
+    async getOpenAIResponse() {
         try {
             const currentTime = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
             const fullInstructions = `Current Server Time: ${currentTime}\n\n${systemInstructions}`;
 
-            const model = genAI.getGenerativeModel({
-                model: "gemini-1.0-pro",
-                systemInstruction: fullInstructions
+            // Convert Gemini history format to OpenAI format
+            const messages = [
+                { role: "system", content: fullInstructions },
+                ...this.conversationHistory.map(msg => ({
+                    role: msg.role === 'user' ? 'user' : 'assistant',
+                    content: msg.parts[0].text
+                }))
+            ];
+
+            const completion = await openai.chat.completions.create({
+                model: "gpt-4-turbo-preview",
+                messages: messages,
+                temperature: 0.9,
+                max_tokens: 200,
             });
 
-            const chat = model.startChat({
-                history: this.conversationHistory.slice(0, -1), // Exclude the last message
-                generationConfig: {
-                    temperature: 0.9,
-                    topP: 0.95,
-                    topK: 40,
-                    maxOutputTokens: 200,
-                }
-            });
-
-            const result = await chat.sendMessage(this.conversationHistory[this.conversationHistory.length - 1].parts[0].text);
-            return result.response.text();
+            return completion.choices[0].message.content;
 
         } catch (error) {
-            console.error(`❌ Gemini error:`, error);
+            console.error(`❌ OpenAI error:`, error);
             return "I apologize, I'm having trouble processing that. Could you please repeat?";
         }
     }
@@ -640,7 +643,7 @@ fastify.get('/health', async (request, reply) => {
     const results = await Promise.all([
         checkDeepgramHealth(),
         checkElevenLabsHealth(),
-        checkGeminiHealth()
+        checkOpenAIHealth()
     ]);
 
     const allOk = results.every(r => r.status === 'ok');

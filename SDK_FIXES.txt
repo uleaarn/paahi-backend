@@ -1,0 +1,25 @@
+// CRITICAL FIXES FOR SDK AUTHENTICATION
+// Add these changes to server.js
+
+// 1. Update line 88 in checkElevenLabsHealth() to store voice ID:
+if (response.ok) {
+    const voicesJson = await response.json();
+    const firstVoice = voicesJson?.voices?.[0];
+    if (firstVoice) {
+        ELEVENLABS_VOICE_ID = firstVoice.voice_id;
+        console.log(`✅ ElevenLabs API key is valid (voice: ${firstVoice.name}, ID: ${ELEVENLABS_VOICE_ID})`);
+    } else {
+        console.log('✅ ElevenLabs API key is valid (no voices available)');
+    }
+    return { status: 'ok', service: 'ElevenLabs', voiceId: ELEVENLABS_VOICE_ID };
+}
+
+// 2. Change line 295 in synthesizeAndSend() from:
+voice: "Rachel",
+// TO:
+voice: ELEVENLABS_VOICE_ID || "21m00Tcm4TlvDq8ikWAM", // Rachel's actual voice_id
+
+// 3. Change line 298 in synthesizeAndSend() from:
+output_format: "pcm_16000"
+// TO:
+output_format: "pcm_8000"  // Match Twilio's 8kHz sample rate
