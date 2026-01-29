@@ -56,7 +56,10 @@ try {
 }
 
 // Initialize AI clients
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+const openai = new OpenAI({
+    apiKey: OPENAI_API_KEY,
+    baseURL: 'https://api.deepseek.com'
+});
 const deepgram = createClient(DEEPGRAM_API_KEY);
 const elevenlabs = new ElevenLabsClient({ apiKey: ELEVENLABS_API_KEY });
 
@@ -158,7 +161,7 @@ async function checkElevenLabsHealth() {
 async function checkOpenAIHealth() {
     try {
         const response = await openai.chat.completions.create({
-            model: "gpt-4o",
+            model: "deepseek-chat",
             messages: [{ role: "user", content: "test" }],
             max_tokens: 5
         });
@@ -410,7 +413,7 @@ class VoiceSession {
             ];
 
             const completion = await openai.chat.completions.create({
-                model: "gpt-4o",
+                model: "deepseek-chat",
                 messages: messages,
                 temperature: 0.9,
                 max_tokens: 200,
