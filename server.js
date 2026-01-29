@@ -158,7 +158,7 @@ async function checkElevenLabsHealth() {
 async function checkOpenAIHealth() {
     try {
         const response = await openai.chat.completions.create({
-            model: "gpt-4-turbo-preview",
+            model: "gpt-4o",
             messages: [{ role: "user", content: "test" }],
             max_tokens: 5
         });
@@ -410,7 +410,7 @@ class VoiceSession {
             ];
 
             const completion = await openai.chat.completions.create({
-                model: "gpt-4-turbo-preview",
+                model: "gpt-4o",
                 messages: messages,
                 temperature: 0.9,
                 max_tokens: 200,
