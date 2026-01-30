@@ -509,6 +509,14 @@ class VoiceSession {
         // ONLY submit when customer has provided BOTH name AND phone AND there are order items
         const shouldSubmit = hasName && hasPhone && hasOrderItems;
 
+        // DEBUG: Always log detection status
+        console.log('🔍 Order detection check:');
+        console.log(`   - Conversation text: "${conversationText.substring(0, 200)}..."`);
+        console.log(`   - Has name: ${hasName}`);
+        console.log(`   - Has phone: ${hasPhone}`);
+        console.log(`   - Has order items: ${hasOrderItems}`);
+        console.log(`   - Should submit: ${shouldSubmit}`);
+
         if (shouldSubmit) {
             console.log('🎯 Order completion detected!');
             console.log(`   - Has name: ${hasName}`);
