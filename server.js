@@ -526,8 +526,30 @@ class VoiceSession {
             console.log(`   - AI asking for phone: ${isAskingForPhone}`);
 
             // Extract customer info from conversation
-            const nameMatch = conversationText.match(/(?:name|called?|i'm|i am)\s+(?:is\s+)?([a-z]{2,}(?:\s+[a-z]{2,})?)/i);
-            const phoneMatch = conversationText.match(/(\d{3}[-.\\s]?\d{3}[-.\\s]?\d{4}|\d{10})/);
+            // For name: Look for the customer's response AFTER the AI asks for their name
+            let customerName = 'Unknown';
+            const history = this.conversationHistory;
+            for (let i = 0; i < history.length - 1; i++) {
+                const msg = history[i];
+                const nextMsg = history[i + 1];
+
+                // Check if AI asked for name
+                if (msg.role === 'model' && msg.parts[0].text.toLowerCase().includes('may i have your name')) {
+                    // Next message should be the customer's name
+                    if (nextMsg.role === 'user') {
+                        // Extract the name from the user's response
+                        const userResponse = nextMsg.parts[0].text.trim();
+                        // Remove common filler words and extract the actual name
+                        customerName = userResponse
+                            .replace(/^(my name is|i'm|i am|it's|its)\s+/i, '')
+                            .replace(/[.,!?]$/g, '')
+                            .trim();
+                        break;
+                    }
+                }
+            }
+
+            const phoneMatch = conversationText.match(/(\d{3}[-.\s]?\d{3}[-.\s]?\d{4}|\d{10})/);
 
             // Extract order items from conversation
             const orderItems = [];
@@ -538,8 +560,8 @@ class VoiceSession {
 
             // Build order data
             const orderData = {
-                customer_name: nameMatch ? nameMatch[1].trim() : 'Unknown',
-                customer_phone: phoneMatch ? phoneMatch[1].replace(/[-.\\s]/g, '') : 'Unknown',
+                customer_name: customerName,
+                customer_phone: phoneMatch ? phoneMatch[1].replace(/[-.\s]/g, '') : 'Unknown',
                 items: orderItems.length > 0 ? orderItems.join(', ') : 'Order in progress',
                 order_summary: `Items: ${orderItems.join(', ') || 'N/A'}. Latest response: ${aiResponse}`,
                 timestamp: new Date().toISOString(),
