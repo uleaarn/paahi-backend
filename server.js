@@ -480,42 +480,70 @@ class VoiceSession {
         // Don't submit if already submitted
         if (this.orderSubmitted) return;
 
-        // Parse AI response for order completion signals
         const lowerResponse = aiResponse.toLowerCase();
+        const conversationText = this.conversationHistory
+            .map(msg => msg.parts[0].text)
+            .join(' ')
+            .toLowerCase();
 
-        // Check if this looks like an order confirmation or completion
-        const isOrderComplete = (
-            (lowerResponse.includes('your order') || lowerResponse.includes('your total')) &&
-            (lowerResponse.includes('thank you') || lowerResponse.includes('confirmed') ||
-                lowerResponse.includes('placed') || lowerResponse.includes('submitted'))
-        ) || (
-                lowerResponse.includes('order has been') &&
-                (lowerResponse.includes('placed') || lowerResponse.includes('confirmed'))
-            );
+        // IMPROVED DETECTION: Check if AI is asking for customer details (name/phone)
+        // This indicates the order is being finalized
+        const isAskingForName = lowerResponse.includes('name') &&
+            (lowerResponse.includes('may i have') || lowerResponse.includes('can i get') ||
+                lowerResponse.includes('what is') || lowerResponse.includes('could you provide'));
 
-        // Extract order details from conversation history
-        if (isOrderComplete) {
-            console.log('🎯 Order completion detected, extracting order details...');
+        const isAskingForPhone = lowerResponse.includes('phone') &&
+            (lowerResponse.includes('number') || lowerResponse.includes('contact'));
 
-            // Parse conversation for order items, name, and phone
-            const conversationText = this.conversationHistory
-                .map(msg => msg.parts[0].text)
-                .join(' ');
+        // Also check if customer has already provided name AND phone in conversation
+        const hasName = /(?:name|called?|i'm|i am)\s+(?:is\s+)?([a-z]{2,})/i.test(conversationText);
+        const hasPhone = /(\d{3}[-.\\s]?\d{3}[-.\\s]?\d{4}|\d{10})/.test(conversationText);
+
+        // Check if there are order items in the conversation
+        const hasOrderItems = conversationText.includes('samosa') ||
+            conversationText.includes('tikka') ||
+            conversationText.includes('naan') ||
+            conversationText.includes('curry') ||
+            conversationText.includes('biryani');
+
+        // Trigger submission if:
+        // 1. AI is asking for name/phone (order finalization started), OR
+        // 2. Customer has provided both name AND phone AND there are order items
+        const shouldSubmit = (isAskingForName || isAskingForPhone) ||
+            (hasName && hasPhone && hasOrderItems);
+
+        if (shouldSubmit) {
+            console.log('🎯 Order completion detected!');
+            console.log(`   - Has name: ${hasName}`);
+            console.log(`   - Has phone: ${hasPhone}`);
+            console.log(`   - Has order items: ${hasOrderItems}`);
+            console.log(`   - AI asking for name: ${isAskingForName}`);
+            console.log(`   - AI asking for phone: ${isAskingForPhone}`);
 
             // Extract customer info from conversation
-            const nameMatch = conversationText.match(/(?:name|called?)\s+(?:is\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i);
-            const phoneMatch = conversationText.match(/(\d{3}[-.\s]?\d{3}[-.\s]?\d{4}|\d{10})/);
+            const nameMatch = conversationText.match(/(?:name|called?|i'm|i am)\s+(?:is\s+)?([a-z]{2,}(?:\s+[a-z]{2,})?)/i);
+            const phoneMatch = conversationText.match(/(\d{3}[-.\\s]?\d{3}[-.\\s]?\d{4}|\d{10})/);
+
+            // Extract order items from conversation
+            const orderItems = [];
+            const itemMatches = conversationText.matchAll(/(one|two|three|four|five|\d+)\s+([a-z\s]+(?:samosa|tikka|masala|naan|curry|biryani|rice))/gi);
+            for (const match of itemMatches) {
+                orderItems.push(match[0]);
+            }
 
             // Build order data
             const orderData = {
-                customer_name: nameMatch ? nameMatch[1] : 'Unknown',
-                customer_phone: phoneMatch ? phoneMatch[1].replace(/[-.\s]/g, '') : 'Unknown',
-                items: aiResponse, // Full AI response contains order summary
-                order_summary: aiResponse,
+                customer_name: nameMatch ? nameMatch[1].trim() : 'Unknown',
+                customer_phone: phoneMatch ? phoneMatch[1].replace(/[-.\\s]/g, '') : 'Unknown',
+                items: orderItems.length > 0 ? orderItems.join(', ') : 'Order in progress',
+                order_summary: `Items: ${orderItems.join(', ') || 'N/A'}. Latest response: ${aiResponse}`,
                 timestamp: new Date().toISOString(),
                 source: 'voice_call',
+                session_id: this.streamSid,
                 conversation_history: this.conversationHistory
             };
+
+            console.log('📦 Order data prepared:', JSON.stringify(orderData, null, 2));
 
             // Submit to n8n
             const result = await submitOrderToN8n(orderData);
@@ -528,6 +556,7 @@ class VoiceSession {
             }
         }
     }
+
 
     async synthesizeAndSend(text) {
         try {
