@@ -506,11 +506,8 @@ class VoiceSession {
             conversationText.includes('curry') ||
             conversationText.includes('biryani');
 
-        // Trigger submission if:
-        // 1. AI is asking for name/phone (order finalization started), OR
-        // 2. Customer has provided both name AND phone AND there are order items
-        const shouldSubmit = (isAskingForName || isAskingForPhone) ||
-            (hasName && hasPhone && hasOrderItems);
+        // ONLY submit when customer has provided BOTH name AND phone AND there are order items
+        const shouldSubmit = hasName && hasPhone && hasOrderItems;
 
         if (shouldSubmit) {
             console.log('🎯 Order completion detected!');
