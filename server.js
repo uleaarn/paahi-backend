@@ -497,7 +497,8 @@ class VoiceSession {
 
         // Also check if customer has already provided name AND phone in conversation
         const hasName = /(?:name|called?|i'm|i am)\s+(?:is\s+)?([a-z]{2,})/i.test(conversationText);
-        const hasPhone = /(\d{3}[-.\\s]?\d{3}[-.\\s]?\d{4}|\d{10})/.test(conversationText);
+        // Fixed regex: matches (425) 683-1803, 425-683-1803, 425.683.1803, 4256831803
+        const hasPhone = /(\(\d{3}\)\s?\d{3}[-.\s]?\d{4}|\d{3}[-.\s]?\d{3}[-.\s]?\d{4}|\d{10})/.test(conversationText);
 
         // Check if there are order items in the conversation
         const hasOrderItems = conversationText.includes('samosa') ||
@@ -533,15 +534,24 @@ class VoiceSession {
                 const msg = history[i];
                 const nextMsg = history[i + 1];
 
-                // Check if AI asked for name
-                if (msg.role === 'model' && msg.parts[0].text.toLowerCase().includes('may i have your name')) {
+                // Check if AI asked for name (multiple patterns)
+                const aiText = msg.parts[0].text.toLowerCase();
+                const isAskingForName = msg.role === 'model' && (
+                    aiText.includes('may i have your name') ||
+                    aiText.includes('your name') ||
+                    aiText.includes('name for the order') ||
+                    aiText.includes('can i get your name')
+                );
+
+                if (isAskingForName) {
                     // Next message should be the customer's name
                     if (nextMsg.role === 'user') {
                         // Extract the name from the user's response
                         const userResponse = nextMsg.parts[0].text.trim();
-                        // Remove common filler words and extract the actual name
+                        // Remove common filler words, punctuation, and letter-by-letter spelling
                         customerName = userResponse
-                            .replace(/^(my name is|i'm|i am|it's|its)\s+/i, '')
+                            .replace(/^(my name is|i'm|i am|it's|its|this is)\s+/i, '')
+                            .replace(/,\s*[a-z]\s+[a-z]\s+[a-z].*$/i, '') // Remove "n a y a n" spelling
                             .replace(/[.,!?]$/g, '')
                             .trim();
                         break;
@@ -549,7 +559,8 @@ class VoiceSession {
                 }
             }
 
-            const phoneMatch = conversationText.match(/(\d{3}[-.\s]?\d{3}[-.\s]?\d{4}|\d{10})/);
+            // Extract phone with support for (425) 683-1803, 425-683-1803, etc.
+            const phoneMatch = conversationText.match(/(\(\d{3}\)\s?\d{3}[-.\s]?\d{4}|\d{3}[-.\s]?\d{3}[-.\s]?\d{4}|\d{10})/);
 
             // Extract order items from conversation
             const orderItems = [];
@@ -561,7 +572,8 @@ class VoiceSession {
             // Build order data
             const orderData = {
                 customer_name: customerName,
-                customer_phone: phoneMatch ? phoneMatch[1].replace(/[-.\s]/g, '') : 'Unknown',
+                // Keep phone formatting with parentheses/dashes for readability
+                customer_phone: phoneMatch ? phoneMatch[1] : 'Unknown',
                 items: orderItems.length > 0 ? orderItems.join(', ') : 'Order in progress',
                 order_summary: `Items: ${orderItems.join(', ') || 'N/A'}. Latest response: ${aiResponse}`,
                 timestamp: new Date().toISOString(),
