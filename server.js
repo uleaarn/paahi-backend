@@ -547,13 +547,29 @@ class VoiceSession {
                     // Next message should be the customer's name
                     if (nextMsg.role === 'user') {
                         // Extract the name from the user's response
-                        const userResponse = nextMsg.parts[0].text.trim();
-                        // Remove common filler words, punctuation, and letter-by-letter spelling
-                        customerName = userResponse
-                            .replace(/^(my name is|i'm|i am|it's|its|this is)\s+/i, '')
-                            .replace(/,\s*[a-z]\s+[a-z]\s+[a-z].*$/i, '') // Remove "n a y a n" spelling
-                            .replace(/[.,!?]$/g, '')
-                            .trim();
+                        let userResponse = nextMsg.parts[0].text.trim();
+
+                        // Remove common filler words first
+                        userResponse = userResponse.replace(/^(my name is|i'm|i am|it's|its|this is)\s+/i, '');
+
+                        // Check if there's a pattern like "B a b u, Babu" (spelling followed by actual name)
+                        const spellingWithName = userResponse.match(/^([a-z]\s+){2,}[a-z],\s*([a-z]+)/i);
+                        if (spellingWithName) {
+                            // Use the actual name after the comma
+                            customerName = spellingWithName[2];
+                        } else {
+                            // Check if it's ONLY letter-by-letter spelling (e.g., "B o b" or "n a y a n")
+                            const onlySpelling = userResponse.match(/^([a-z]\s+)+[a-z]$/i);
+                            if (onlySpelling) {
+                                // Join the letters together to form the name
+                                customerName = userResponse.replace(/\s+/g, '');
+                            } else {
+                                // Regular name, just clean it up
+                                customerName = userResponse
+                                    .replace(/[.,!?]$/g, '')
+                                    .trim();
+                            }
+                        }
                         break;
                     }
                 }
