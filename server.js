@@ -3,7 +3,6 @@ import FastifyWebSocket from '@fastify/websocket';
 import FastifyFormBody from '@fastify/formbody';
 import OpenAI from 'openai';
 import { createClient } from '@deepgram/sdk';
-import { ElevenLabsClient, stream } from "elevenlabs";
 import textToSpeech from '@google-cloud/text-to-speech';
 import WebSocket from 'ws';
 import dotenv from 'dotenv';
@@ -11,6 +10,8 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import mulaw from 'alawmulaw';
+import analytics from './analytics.js';
+import emailService from './email-service.js';
 // Polyfill WebSocket for Deepgram SDK
 globalThis.WebSocket = WebSocket;
 
@@ -30,14 +31,16 @@ const __dirname = path.dirname(__filename);
 // Configuration
 const PORT = process.env.PORT || 3000;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const LLM_BASE_URL = process.env.LLM_BASE_URL || 'https://api.deepseek.com';
+const LLM_MODEL = process.env.LLM_MODEL || 'deepseek-chat';
 const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY;
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY; // Optional, using Google TTS now
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
+const GOOGLE_TTS_VOICE = process.env.GOOGLE_TTS_VOICE || 'en-US-Neural2-D';
+const GOOGLE_TTS_LANGUAGE = process.env.GOOGLE_TTS_LANGUAGE || 'en-US';
 
 if (!OPENAI_API_KEY || !DEEPGRAM_API_KEY) {
     console.error('❌ Missing required API keys');
     console.error('Required: OPENAI_API_KEY, DEEPGRAM_API_KEY');
-    console.error('Optional: ELEVENLABS_API_KEY (using Google Cloud TTS by default)');
     console.error('Optional: N8N_WEBHOOK_URL (for order submission)');
     process.exit(1);
 }
@@ -57,16 +60,19 @@ try {
     process.exit(1);
 }
 
+const RESTAURANT_NAME = process.env.RESTAURANT_NAME || menu.restaurant_name || 'the restaurant';
+const RESTAURANT_LOCATION = process.env.RESTAURANT_LOCATION || menu.location || '';
+const RESTAURANT_PHONE = process.env.RESTAURANT_PHONE || menu.phone || '';
+const AGENT_NAME = process.env.AGENT_NAME || `${RESTAURANT_NAME} AI`;
+const INITIAL_GREETING = process.env.INITIAL_GREETING ||
+    `Hello! Thank you for calling ${RESTAURANT_NAME}. How can I help you today?`;
+
 // Initialize AI clients
 const openai = new OpenAI({
     apiKey: OPENAI_API_KEY,
-    baseURL: 'https://api.deepseek.com'
+    baseURL: LLM_BASE_URL
 });
 const deepgram = createClient(DEEPGRAM_API_KEY);
-const elevenlabs = new ElevenLabsClient({ apiKey: ELEVENLABS_API_KEY });
-
-// Store ElevenLabs voice ID globally
-let ELEVENLABS_VOICE_ID = null;
 
 // Deepgram WebSocket diagnostic probe
 async function probeDeepgramWebSocket() {
@@ -129,49 +135,18 @@ async function checkDeepgramHealth() {
     }
 }
 
-async function checkElevenLabsHealth() {
-    try {
-        const response = await fetch('https://api.elevenlabs.io/v1/voices', {
-            headers: {
-                'xi-api-key': ELEVENLABS_API_KEY,
-                'Content-Type': 'application/json'
-            }
-        });
-
-        if (response.ok) {
-            const voicesJson = await response.json();
-            const firstVoice = voicesJson?.voices?.[0];
-            if (firstVoice) {
-                ELEVENLABS_VOICE_ID = firstVoice.voice_id;
-                console.log(`✅ ElevenLabs API key is valid (voice: ${firstVoice.name}, ID: ${ELEVENLABS_VOICE_ID})`);
-            } else {
-                console.log("✅ ElevenLabs API key is valid (no voices available)");
-            }
-            return { status: 'ok', service: 'ElevenLabs' };
-        } else {
-            const text = await response.text();
-            console.error(`❌ ElevenLabs API key invalid: ${response.status} ${response.statusText}`);
-            console.error(`Response: ${text.substring(0, 200)}`);
-            return { status: 'error', service: 'ElevenLabs', error: `${response.status}: ${text.substring(0, 200)}` };
-        }
-    } catch (error) {
-        console.error(`❌ ElevenLabs health check failed:`, error.message);
-        return { status: 'error', service: 'ElevenLabs', error: error.message };
-    }
-}
-
 async function checkOpenAIHealth() {
     try {
         const response = await openai.chat.completions.create({
-            model: "deepseek-chat",
+            model: LLM_MODEL,
             messages: [{ role: "user", content: "test" }],
             max_tokens: 5
         });
-        console.log('✅ OpenAI API key is valid');
-        return { status: 'ok', service: 'OpenAI' };
+        console.log('✅ LLM API key is valid');
+        return { status: 'ok', service: 'LLM', model: LLM_MODEL };
     } catch (error) {
-        console.error(`❌ OpenAI API key invalid:`, error.message);
-        return { status: 'error', service: 'OpenAI', error: error.message };
+        console.error(`❌ LLM API key invalid:`, error.message);
+        return { status: 'error', service: 'LLM', model: LLM_MODEL, error: error.message };
     }
 }
 
@@ -180,7 +155,6 @@ async function runStartupHealthChecks() {
     console.log('\n🔍 Running API health checks...');
     const results = await Promise.all([
         checkDeepgramHealth(),
-        checkElevenLabsHealth(),
         checkOpenAIHealth()
     ]);
 
@@ -319,6 +293,8 @@ class VoiceSession {
         this.isSpeaking = false;  // True when TTS is playing
         this.cooldownUntil = 0;   // Timestamp to ignore transcripts until
         this.ttsStartTime = 0;    // When TTS started (to filter short greetings)
+        this.lastUserSpeechTime = 0;  // Track when user last spoke (for barge-in)
+        this.bargeInDetected = false;  // Flag for user interruption
 
         // Order tracking
         this.orderData = {
@@ -334,6 +310,10 @@ class VoiceSession {
         this.frameSizes = [];
         this.sendIntervals = [];
         this.lastFrameSendTime = 0;
+
+        // Analytics tracking
+        this.callStartTime = new Date().toISOString();
+        this.callEndTime = null;
 
         console.log(`🎙️ New session: ${streamSid}`);
         this.initializeDeepgram();
@@ -390,22 +370,65 @@ class VoiceSession {
     async processTranscript(transcript) {
         const now = Date.now();
 
-        // HARD GATE: Block ALL transcripts during TTS playback + cooldown
-        if (this.isSpeaking || now < this.cooldownUntil) {
-            console.log(`🚫 STT GATED: isSpeaking=${this.isSpeaking}, cooldown=${now < this.cooldownUntil}, transcript="${transcript}"`);
+        // ENHANCED VALIDATION: Filter out obvious misrecognitions and noise
+        const cleanTranscript = transcript.trim();
+
+        // Filter out very short or nonsensical transcripts
+        if (cleanTranscript.length < 2) {
+            console.log(`🚫 FILTERED: Too short - "${transcript}"`);
             return;
         }
 
-        // Filter short greetings that arrive within 2s of TTS start (likely echo/noise)
+        // Filter out single letters or repeated characters (likely noise)
+        if (/^[a-z]$/i.test(cleanTranscript) || /^(.)\1+$/i.test(cleanTranscript)) {
+            console.log(`🚫 FILTERED: Single letter/repeated chars - "${transcript}"`);
+            return;
+        }
+
+        // BARGE-IN DETECTION: Allow user to interrupt during TTS
+        if (this.isSpeaking) {
+            // Check if this looks like intentional user speech (not echo)
+            const timeSinceTTSStart = now - this.ttsStartTime;
+            const isLikelyUserSpeech = cleanTranscript.length > 5 && timeSinceTTSStart > 1000;
+
+            if (isLikelyUserSpeech) {
+                console.log(`🎤 BARGE-IN DETECTED: User interrupting TTS - "${transcript}"`);
+                this.bargeInDetected = true;
+                this.stopPlaybackForBargeIn();
+                // Continue processing the transcript
+            } else {
+                console.log(`🚫 STT GATED (TTS playing): isSpeaking=true, transcript="${transcript}"`);
+                return;
+            }
+        }
+
+        // COOLDOWN GATE: Block transcripts during post-TTS cooldown (unless barge-in)
+        if (!this.bargeInDetected && now < this.cooldownUntil) {
+            console.log(`🚫 STT GATED (cooldown): ${this.cooldownUntil - now}ms remaining, transcript="${transcript}"`);
+            return;
+        }
+
+        // Reset barge-in flag
+        this.bargeInDetected = false;
+
+        // ECHO DETECTION: Filter short greetings that arrive within 2s of TTS start
         const timeSinceTTS = now - this.ttsStartTime;
-        const isShortGreeting = /^(hello|hi|hey)[\?]?$/i.test(transcript.trim());
+        const isShortGreeting = /^(hello|hi|hey|yes|no)[\?]?$/i.test(cleanTranscript);
         if (isShortGreeting && timeSinceTTS < 2000) {
-            console.log(`🚫 FILTERED SHORT GREETING: "${transcript}" (${timeSinceTTS}ms since TTS start)`);
+            console.log(`🚫 FILTERED ECHO: "${transcript}" (${timeSinceTTS}ms since TTS start)`);
+            return;
+        }
+
+        // DUPLICATE DETECTION: Ignore if same as last transcript within 3 seconds
+        const timeSinceLastSpeech = now - this.lastUserSpeechTime;
+        if (cleanTranscript === this.lastTranscript && timeSinceLastSpeech < 3000) {
+            console.log(`🚫 FILTERED DUPLICATE: "${transcript}" (${timeSinceLastSpeech}ms since last)`);
             return;
         }
 
         console.log(`✅ STT ACCEPTED: "${transcript}" (isSpeaking=${this.isSpeaking}, cooldownUntil=${this.cooldownUntil}, now=${now})`);
-        console.log(`📝 FINAL: "${transcript}"`);
+        this.lastUserSpeechTime = now;
+        this.lastTranscript = cleanTranscript;
 
         if (this.isProcessing) {
             console.log('⏳ Already processing, queuing...');
@@ -421,11 +444,11 @@ class VoiceSession {
                 parts: [{ text: transcript }]
             });
 
-            // Get response from OpenAI
+            // Get response from the configured chat model
             const response = await this.getOpenAIResponse();
 
             if (response) {
-                console.log(`🤖 OpenAI: "${response}"`);
+                console.log(`🤖 LLM: "${response}"`);
 
                 // Add assistant response to history
                 this.conversationHistory.push({
@@ -450,9 +473,19 @@ class VoiceSession {
     async getOpenAIResponse() {
         try {
             const currentTime = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
-            const fullInstructions = `Current Server Time: ${currentTime}\n\n${systemInstructions}`;
+            const restaurantContext = [
+                `Agent Name: ${AGENT_NAME}`,
+                `Restaurant Name: ${RESTAURANT_NAME}`,
+                RESTAURANT_LOCATION ? `Restaurant Location: ${RESTAURANT_LOCATION}` : null,
+                RESTAURANT_PHONE ? `Restaurant Phone: ${RESTAURANT_PHONE}` : null,
+                '',
+                'Use the following Menu Data as the source of truth for restaurant details, hours, items, modifiers, and prices:',
+                JSON.stringify(menu)
+            ].filter(Boolean).join('\n');
 
-            // Convert Gemini history format to OpenAI format
+            const fullInstructions = `Current Server Time: ${currentTime}\n\n${restaurantContext}\n\n${systemInstructions}`;
+
+            // Convert internal conversation history to OpenAI-compatible messages
             const messages = [
                 { role: "system", content: fullInstructions },
                 ...this.conversationHistory.map(msg => ({
@@ -462,7 +495,7 @@ class VoiceSession {
             ];
 
             const completion = await openai.chat.completions.create({
-                model: "deepseek-chat",
+                model: LLM_MODEL,
                 messages: messages,
                 temperature: 0.9,
                 max_tokens: 200,
@@ -606,6 +639,15 @@ class VoiceSession {
             if (result.success) {
                 this.orderSubmitted = true;
                 console.log('✅ Order successfully submitted and saved to database');
+
+                // Send email notification to restaurant
+                console.log('📧 Sending email notification to restaurant...');
+                const emailResult = await emailService.sendOrderConfirmation(orderData);
+                if (emailResult.success) {
+                    console.log(`✅ Email sent to ${emailResult.recipient}`);
+                } else {
+                    console.error('❌ Email notification failed:', emailResult.error);
+                }
             } else {
                 console.error('❌ Order submission failed:', result.error);
             }
@@ -617,10 +659,6 @@ class VoiceSession {
         try {
             this.ttsStartTime = Date.now(); // Track when TTS starts for greeting filter
             console.log(`🔊 Synthesizing: "${text.substring(0, 50)}..."`);
-            if (!ELEVENLABS_VOICE_ID) {
-                console.error('❌ No ElevenLabs voice ID available');
-                return;
-            }
 
             // 🎯 Google Cloud TTS - Returns clean LINEAR16 PCM @ 8kHz
             const ttsClient = new textToSpeech.TextToSpeechClient();
@@ -628,8 +666,8 @@ class VoiceSession {
             const request = {
                 input: { text },
                 voice: {
-                    languageCode: 'en-US',
-                    name: 'en-US-Neural2-D', // Natural-sounding voice
+                    languageCode: GOOGLE_TTS_LANGUAGE,
+                    name: GOOGLE_TTS_VOICE,
                 },
                 audioConfig: {
                     audioEncoding: 'LINEAR16',
@@ -760,10 +798,10 @@ class VoiceSession {
                     console.log(`   - Frame Size Variance: ${minFrameSize === maxFrameSize ? '✅ None' : '❌ Varies'}`);
                 }
 
-                // HARD GATE: Unblock STT with 250ms cooldown after TTS ends
+                // HARD GATE: Unblock STT with 500ms cooldown after TTS ends (increased from 250ms)
                 this.isSpeaking = false;
-                this.cooldownUntil = Date.now() + 250;
-                console.log(`🔇 TTS PLAYBACK ENDED - STT COOLDOWN 250ms (isSpeaking=false, cooldownUntil=${this.cooldownUntil})`);
+                this.cooldownUntil = Date.now() + 500;
+                console.log(`🔇 TTS PLAYBACK ENDED - STT COOLDOWN 500ms (isSpeaking=false, cooldownUntil=${this.cooldownUntil})`);
                 console.log("✅ Player stopped (queue empty).");
                 return;
             }
@@ -788,9 +826,12 @@ class VoiceSession {
     }
 
     stopPlaybackForBargeIn() {
-        // Call this when user starts speaking
+        // Call this when user starts speaking (barge-in)
         if (this.isPlaying) {
+            console.log('🛑 Stopping TTS playback for user barge-in');
             this.currentStreamAbort = true;
+            this.isSpeaking = false;  // Immediately ungate STT
+            this.cooldownUntil = 0;   // Clear cooldown
         }
     }
 
@@ -811,6 +852,23 @@ class VoiceSession {
     async close() {
         console.log(`🛑 Closing session: ${this.streamSid}`);
 
+        // Log call to analytics
+        this.callEndTime = new Date().toISOString();
+        const callDuration = (new Date(this.callEndTime) - new Date(this.callStartTime)) / 1000; // seconds
+
+        analytics.logCall({
+            callId: this.streamSid,
+            startTime: this.callStartTime,
+            endTime: this.callEndTime,
+            duration: callDuration,
+            transcript: this.conversationHistory,
+            orderCompleted: this.orderSubmitted,
+            orderData: this.orderSubmitted ? this.orderData : null,
+            customerName: this.orderData.customer_name,
+            customerPhone: this.orderData.customer_phone,
+            failureReason: !this.orderSubmitted ? 'Order not completed' : null
+        });
+
         if (this.deepgramConnection) {
             this.deepgramConnection.finish();
         }
@@ -825,13 +883,12 @@ class VoiceSession {
 
 // Routes
 fastify.get('/', async (request, reply) => {
-    return { status: 'ok', message: 'Jalwa Voice Agent - Hybrid Pipeline' };
+    return { status: 'ok', message: `${RESTAURANT_NAME} Voice Agent`, model: LLM_MODEL };
 });
 
 fastify.get('/health', async (request, reply) => {
     const results = await Promise.all([
         checkDeepgramHealth(),
-        checkElevenLabsHealth(),
         checkOpenAIHealth()
     ]);
 
@@ -841,6 +898,33 @@ fastify.get('/health', async (request, reply) => {
         status: allOk ? 'healthy' : 'unhealthy',
         timestamp: new Date().toISOString(),
         services: results
+    };
+});
+
+// Analytics endpoints
+fastify.get('/analytics/summary', async (request, reply) => {
+    const stats = analytics.getStats();
+    return {
+        status: 'ok',
+        data: stats
+    };
+});
+
+fastify.get('/analytics/calls', async (request, reply) => {
+    const limit = parseInt(request.query.limit) || 10;
+    const calls = analytics.getRecentCalls(limit);
+    return {
+        status: 'ok',
+        count: calls.length,
+        data: calls
+    };
+});
+
+fastify.get('/analytics/metrics', async (request, reply) => {
+    const kpis = analytics.getKPIs();
+    return {
+        status: 'ok',
+        data: kpis
     };
 });
 
@@ -876,7 +960,7 @@ fastify.register(async (fastify) => {
 
                         // Send initial greeting
                         setTimeout(async () => {
-                            await session.synthesizeAndSend("Hello! Thank you for calling Jalwa Modern Indian Dining. How can I help you today?");
+                            await session.synthesizeAndSend(INITIAL_GREETING);
                         }, 1000);
                         break;
 

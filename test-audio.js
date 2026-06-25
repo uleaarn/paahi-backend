@@ -151,7 +151,7 @@ function testResampling() {
 }
 
 function testFullPipeline() {
-    console.log('\n🧪 Testing full pipeline (Twilio → Gemini → Twilio)...');
+    console.log('\n🧪 Testing full pipeline (Twilio input → model audio format → Twilio output)...');
 
     // Simulate Twilio input: 8kHz μ-law
     const twilioMulaw = Buffer.alloc(160); // 20ms of audio at 8kHz
@@ -163,12 +163,12 @@ function testFullPipeline() {
 
     console.log(`  Input (Twilio): ${twilioMulaw.length} bytes μ-law @ 8kHz`);
 
-    // Convert to Gemini format: 24kHz PCM16
-    const geminiPcm = AudioConverter.mulawToPCM16_24kHz(twilioMulaw);
-    console.log(`  Converted (Gemini): ${geminiPcm.length} bytes PCM16 @ 24kHz`);
+    // Convert to model audio format: 24kHz PCM16
+    const modelPcm = AudioConverter.mulawToPCM16_24kHz(twilioMulaw);
+    console.log(`  Converted (model): ${modelPcm.length} bytes PCM16 @ 24kHz`);
 
     // Convert back to Twilio format: 8kHz μ-law
-    const twilioMulawOut = AudioConverter.pcm16_24kHzToMulaw(geminiPcm);
+    const twilioMulawOut = AudioConverter.pcm16_24kHzToMulaw(modelPcm);
     console.log(`  Output (Twilio): ${twilioMulawOut.length} bytes μ-law @ 8kHz`);
 
     console.log('  ✅ Full pipeline test completed');
@@ -218,7 +218,7 @@ function testSystemInstructions() {
 // Run all tests
 console.log('╔════════════════════════════════════════════════════════╗');
 console.log('║                                                        ║');
-console.log('║   🧪 Jalwa Voice Agent - Audio Conversion Tests       ║');
+console.log('║   Restaurant Voice Agent - Audio Conversion Tests     ║');
 console.log('║                                                        ║');
 console.log('╚════════════════════════════════════════════════════════╝');
 

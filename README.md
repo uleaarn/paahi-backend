@@ -1,261 +1,146 @@
-# Jalwa Voice Agent 🎙️
+# Paahi Restaurant Voice Agent
 
-Production-ready Twilio → Gemini Live voice agent for Jalwa: Modern Indian Dining restaurant.
+A production-oriented phone ordering agent for restaurants. It answers inbound Twilio calls, transcribes caller audio with Deepgram, uses a configurable OpenAI-compatible chat model to take orders against your menu, speaks back with Google Cloud Text-to-Speech, and can submit completed orders to n8n plus email the restaurant.
 
-## Features
+## What It Includes
 
-- ✅ **Twilio Media Streams Integration**: WebSocket server for real-time voice calls
-- ✅ **Gemini Live API**: Advanced conversational AI with natural voice
-- ✅ **24kHz Audio Conversion**: Seamless 8kHz μ-law ↔ 24kHz PCM16 conversion
-- ✅ **Complete Menu System**: 100+ items with categories, modifiers, and pricing
-- ✅ **Order Management**: Intelligent order validation and tracking
-- ✅ **n8n Webhook Integration**: Automated order submission
-- ✅ **Railway Deployment Ready**: Production configuration included
+- Twilio Media Streams WebSocket endpoint for live phone calls
+- Deepgram real-time speech-to-text
+- Configurable LLM provider through the OpenAI SDK (`LLM_BASE_URL`, `LLM_MODEL`)
+- Google Cloud TTS returning clean 8 kHz LINEAR16 audio for Twilio playback
+- Menu-aware ordering using `data/menu.json`
+- Fuzzy menu matching in `menu-matcher.js`
+- Optional n8n order webhook
+- Optional Gmail/SMTP order notification through Nodemailer
+- Local call analytics in `logs/`
 
 ## Project Structure
 
-```
-paahi-voice-agent/
-├── server.js                    # Main WebSocket server
-├── data/
-│   └── menu.json               # Complete restaurant menu
-├── prompts/
-│   └── system-instructions.md  # Gemini AI system instructions
-├── test-audio.js               # Audio conversion test suite
-├── package.json                # Dependencies
-├── .env.example                # Environment variables template
-└── README.md                   # This file
+```text
+.
+├── server.js
+├── data/menu.json
+├── prompts/system-instructions.md
+├── menu-matcher.js
+├── email-service.js
+├── analytics.js
+├── test-audio.js
+├── test-menu-matcher.js
+├── test-email.js
+├── test-analytics.js
+├── .env.example
+└── railway.json
 ```
 
-## Quick Start
+## Setup
 
-### 1. Install Dependencies
+1. Install dependencies:
 
 ```bash
 npm install
 ```
 
-### 2. Configure Environment
-
-Copy `.env.example` to `.env` and fill in your credentials:
+2. Create your local environment file:
 
 ```bash
 cp .env.example .env
 ```
 
-Required variables:
-- `GEMINI_API_KEY`: Get from [Google AI Studio](https://aistudio.google.com/app/apikey)
-- `N8N_WEBHOOK_URL`: Your n8n webhook endpoint for order submission
-- `PORT`: Server port (default: 3000)
+3. Fill in the required values:
 
-### 3. Test Audio Conversion
-
-```bash
-npm test
+```env
+OPENAI_API_KEY=your_llm_api_key_here
+LLM_BASE_URL=https://api.deepseek.com
+LLM_MODEL=deepseek-chat
+DEEPGRAM_API_KEY=your_deepgram_api_key_here
+GOOGLE_APPLICATION_CREDENTIALS_JSON={"type":"service_account","project_id":"..."}
+RESTAURANT_NAME=Your Restaurant
+RESTAURANT_LOCATION=123 Main St, Your City, ST
+RESTAURANT_PHONE=(555) 123-4567
 ```
 
-This will verify:
-- μ-law encoding/decoding
-- Audio resampling (8kHz ↔ 24kHz)
-- Full pipeline (Twilio → Gemini → Twilio)
-- Menu data loading
-- System instructions loading
+4. Add your real menu in `data/menu.json`.
 
-### 4. Run the Server
+5. Tune the call behavior in `prompts/system-instructions.md`.
 
-```bash
-npm start
-```
+## Run Locally
 
-For development with auto-reload:
 ```bash
 npm run dev
 ```
 
-## Twilio Configuration
-
-### 1. Create a Twilio Phone Number
-
-1. Go to [Twilio Console](https://console.twilio.com/)
-2. Buy a phone number with Voice capabilities
-
-### 2. Configure Media Streams
-
-In your Twilio phone number settings:
-
-**Voice & Fax → Configure:**
-- When a call comes in: **Webhook**
-- URL: `https://your-server.com/twiml`
-- HTTP Method: `POST`
-
-**TwiML Bin (create new):**
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Connect>
-    <Stream url="wss://your-server.com/media-stream" />
-  </Connect>
-</Response>
-```
-
-Replace `your-server.com` with your actual domain (Railway URL or ngrok for local testing).
-
-## Local Development with ngrok
-
-For local testing, use ngrok to expose your server:
+Health check:
 
 ```bash
-# Install ngrok
-brew install ngrok
+curl http://localhost:3000/health
+```
 
-# Start your server
-npm run dev
+For local Twilio testing, expose the server with ngrok:
 
-# In another terminal, expose port 3000
+```bash
 ngrok http 3000
 ```
 
-Use the ngrok HTTPS URL in your Twilio configuration.
+Set your Twilio phone number voice webhook to:
 
-## Railway Deployment
-
-### 1. Create Railway Project
-
-```bash
-# Install Railway CLI
-npm install -g @railway/cli
-
-# Login
-railway login
-
-# Initialize project
-railway init
+```text
+https://YOUR_NGROK_DOMAIN/twiml
 ```
 
-### 2. Set Environment Variables
+The server returns TwiML that connects the call to:
 
-In Railway dashboard:
-- Add `GEMINI_API_KEY`
-- Add `N8N_WEBHOOK_URL`
-- `PORT` is automatically set by Railway
-
-### 3. Deploy
-
-```bash
-railway up
+```text
+wss://YOUR_DOMAIN/media-stream
 ```
 
-Your service will be available at: `https://your-project.railway.app`
+## Tests
 
-## Audio Conversion Technical Details
+```bash
+npm test
+npm run test:menu
+npm run test:analytics
+npm run test:email
+```
 
-### Twilio Format
-- **Encoding**: μ-law (G.711)
-- **Sample Rate**: 8kHz
-- **Bit Depth**: 8-bit compressed
-- **Channels**: Mono
-
-### Gemini Format
-- **Encoding**: PCM16 (Linear PCM)
-- **Sample Rate**: 24kHz
-- **Bit Depth**: 16-bit
-- **Channels**: Mono
-
-### Conversion Pipeline
-
-**Twilio → Gemini:**
-1. Receive base64-encoded μ-law from Twilio
-2. Decode μ-law to PCM16 @ 8kHz
-3. Resample PCM16 from 8kHz to 24kHz
-4. Send to Gemini Live API
-
-**Gemini → Twilio:**
-1. Receive PCM16 @ 24kHz from Gemini
-2. Resample PCM16 from 24kHz to 8kHz
-3. Encode PCM16 to μ-law
-4. Send base64-encoded μ-law to Twilio
-
-## Menu System
-
-The menu is structured with:
-- **14 Categories**: Appetizers, Entrees, Breads, Rice, Desserts, Beverages
-- **100+ Items**: Complete restaurant menu
-- **Modifiers**: Spice levels, dietary restrictions, add-ons
-- **Pricing**: Base prices + modifier costs
-- **Dietary Tags**: Vegetarian, Vegan, Gluten-Free, Spicy, Popular
+`test:email` requires email env vars if you want it to send a real message.
 
 ## Order Flow
 
-1. **Customer calls** → Twilio receives call
-2. **Twilio connects** → WebSocket to server
-3. **Gemini greets** → AI starts conversation
-4. **Customer orders** → AI processes menu requests
-5. **Order validation** → Checks minimums, availability
-6. **Order confirmation** → AI reads back order
-7. **Submit to n8n** → Webhook receives order data
-8. **Order processing** → Your n8n workflow handles fulfillment
+1. Caller phones your Twilio number.
+2. Twilio requests `POST /twiml`.
+3. Twilio opens `WS /media-stream`.
+4. Caller audio streams to Deepgram.
+5. Final transcripts go to the configured chat model with your menu and system prompt.
+6. The response is synthesized with Google Cloud TTS.
+7. Audio is converted to Twilio-compatible mu-law frames.
+8. Completed orders can be sent to n8n and emailed to the restaurant.
 
-## API Endpoints
+## Deployment
 
-- `GET /health` - Health check
-- `WS /media-stream` - Twilio Media Streams WebSocket
+Railway is already configured through `railway.json`.
 
-## Troubleshooting
+Set these environment variables in Railway:
 
-### Audio Issues
-- Run `npm test` to verify audio conversion
-- Check Twilio webhook logs
-- Verify WebSocket connection in server logs
+- `OPENAI_API_KEY`
+- `LLM_BASE_URL`
+- `LLM_MODEL`
+- `DEEPGRAM_API_KEY`
+- `GOOGLE_APPLICATION_CREDENTIALS_JSON`
+- `RESTAURANT_NAME`
+- `RESTAURANT_LOCATION`
+- `RESTAURANT_PHONE`
+- `N8N_WEBHOOK_URL` if you want order submission
+- `EMAIL_USER`, `EMAIL_PASS`, `EMAIL_TO` if you want email notifications
 
-### Gemini Connection
-- Verify `GEMINI_API_KEY` is correct
-- Check API quota and billing
-- Review server logs for connection errors
+After deployment, configure Twilio's inbound voice webhook to:
 
-### Order Submission
-- Verify `N8N_WEBHOOK_URL` is accessible
-- Test webhook manually with curl
-- Check n8n workflow activation
-
-## Development
-
-### Adding Menu Items
-
-Edit `data/menu.json`:
-```json
-{
-  "id": "new_item_001",
-  "name": "New Dish",
-  "description": "Description here",
-  "base_price": 15.00,
-  "sizes": [{ "name": "regular", "price": 15.00 }],
-  "modifiers": ["extra_spicy", "mild"],
-  "popular": false,
-  "vegetarian": true,
-  "vegan": false,
-  "gluten_free": true
-}
+```text
+https://YOUR_RAILWAY_DOMAIN/twiml
 ```
 
-### Customizing AI Behavior
+## Customize For Your Restaurant
 
-Edit `prompts/system-instructions.md` to change:
-- Greeting style
-- Recommendation strategy
-- Order confirmation process
-- Conversation flow
-
-## License
-
-MIT
-
-## Support
-
-For issues or questions:
-- Check server logs: `railway logs`
-- Review Twilio debugger
-- Test audio conversion: `npm test`
-
----
-
-Built with ❤️ for Jalwa: Modern Indian Dining
+- Replace `data/menu.json` with your menu, prices, hours, modifiers, and dietary flags.
+- Update `prompts/system-instructions.md` with your service style, pickup/delivery rules, upsells, and escalation rules.
+- Set `INITIAL_GREETING` if you want a custom first sentence.
+- Set `GOOGLE_TTS_VOICE` to change the speaking voice.

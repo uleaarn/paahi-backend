@@ -1,17 +1,21 @@
 {
-    "name": "jalwa-voice-agent",
+    "name": "paahi-restaurant-voice-agent",
     "version": "1.0.0",
-    "description": "Production Twilio → Gemini Live voice agent for Jalwa restaurant",
+    "description": "Production Twilio voice ordering agent for restaurants",
     "main": "server.js",
     "type": "module",
     "scripts": {
         "start": "node server.js",
         "dev": "node --watch server.js",
-        "test": "node test-audio.js"
+        "test": "node test-audio.js",
+        "test:menu": "node test-menu-matcher.js",
+        "test:email": "node test-email.js",
+        "test:analytics": "node test-analytics.js"
     },
     "keywords": [
         "twilio",
-        "gemini",
+        "deepgram",
+        "google-tts",
         "voice-agent",
         "restaurant",
         "ai"
@@ -23,12 +27,11 @@
         "@fastify/formbody": "^8.0.1",
         "@fastify/websocket": "^11.0.1",
         "@google-cloud/text-to-speech": "^6.4.0",
-        "@google/generative-ai": "^0.21.0",
         "alawmulaw": "^6.0.0",
         "audiobuffer-to-wav": "^1.0.0",
         "dotenv": "^16.4.5",
-        "elevenlabs": "^1.59.0",
         "fastify": "^5.2.0",
+        "nodemailer": "^6.9.0",
         "openai": "^6.17.0",
         "pcm-convert": "^1.6.5",
         "ws": "^8.19.0"
