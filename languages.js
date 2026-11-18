@@ -13,31 +13,36 @@
  * Provider facts (checked against Deepgram and Google Cloud docs, Nov 2026):
  *   - Deepgram nova-3 transcribes en, es, fr, hi, te; nova-2 has no Telugu.
  *   - nova-3 language=multi covers all five and tags each word's language.
+ *   - Deepgram Aura voices: en, es, fr, de, nl, it, ja (no Hindi or Telugu).
+ *     Aura returns μ-law 8 kHz directly, so English uses it (no Google needed).
  *   - Google TTS has en-US/es-US/fr-FR/hi-IN Neural2 voices; te-IN has
- *     Standard and Chirp3-HD voices only.
+ *     Standard and Chirp3-HD voices only. Used for the other languages until a
+ *     Hindi/Telugu provider (Sarvam) is added.
  */
 
 export const LANGUAGES = {
     en: {
         name: 'English', native: 'English', status: 'pilot',
-        stt: 'en', tts: { languageCode: 'en-US', voice: 'en-US-Neural2-D' },
+        stt: 'en',
+        tts: { provider: 'deepgram', voice: 'aura-2-thalia-en' },
+        ttsFallbacks: [{ provider: 'google', languageCode: 'en-US', voice: 'en-US-Neural2-D' }],
     },
     es: {
         name: 'Spanish', native: 'Español', status: 'experimental',
-        stt: 'es', tts: { languageCode: 'es-US', voice: 'es-US-Neural2-A' },
+        stt: 'es', tts: { provider: 'google', languageCode: 'es-US', voice: 'es-US-Neural2-A' },
     },
     fr: {
         name: 'French', native: 'Français', status: 'experimental',
-        stt: 'fr', tts: { languageCode: 'fr-FR', voice: 'fr-FR-Neural2-F' },
+        stt: 'fr', tts: { provider: 'google', languageCode: 'fr-FR', voice: 'fr-FR-Neural2-F' },
     },
     hi: {
         name: 'Hindi', native: 'हिन्दी', status: 'experimental',
         // Male voice: the Hindi phrases below use masculine first-person verbs.
-        stt: 'hi', tts: { languageCode: 'hi-IN', voice: 'hi-IN-Neural2-B' },
+        stt: 'hi', tts: { provider: 'google', languageCode: 'hi-IN', voice: 'hi-IN-Neural2-B' },
     },
     te: {
         name: 'Telugu', native: 'తెలుగు', status: 'experimental',
-        stt: 'te', tts: { languageCode: 'te-IN', voice: 'te-IN-Standard-A' },
+        stt: 'te', tts: { provider: 'google', languageCode: 'te-IN', voice: 'te-IN-Standard-A' },
     },
 };
 

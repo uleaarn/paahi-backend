@@ -18,7 +18,7 @@ What exists today:
 7. The order is **saved in Supabase Postgres** (row-level security keeps each business to its own rows). Only then does the caller hear "your order is in".
 8. Staff are notified by email and/or webhook from an outbox, with retries. Delivery is tracked separately from the order.
 9. If the save fails, the caller asks for a person, or the model fails twice, Paahi records a staff callback request and says so truthfully.
-10. Replies are spoken with **Google Cloud TTS** in the call language. The caller can interrupt, and the call hangs up after the goodbye has played.
+10. Replies are spoken in the call language: **Deepgram Aura** for English (same key as listening), Google Cloud TTS for the other languages. The caller can interrupt, and the call hangs up after the goodbye has played.
 
 | File | Job |
 |---|---|
