@@ -240,7 +240,8 @@ class EmailService {
 
         try {
             const htmlContent = this.formatOrderEmail({ ...orderData, business_name: businessName });
-            const subject = `${orderData.type === 'callback_request' ? 'CALL BACK' : 'New Order'}: ${orderData.customer_name || 'Customer'} - ${new Date(orderData.timestamp).toLocaleTimeString('en-US', { timeZone: 'America/New_York' })}`;
+            const scheduled = orderData.pickup_time && orderData.pickup_time !== 'ASAP' ? ` (SCHEDULED ${orderData.pickup_time})` : '';
+            const subject = `${orderData.type === 'callback_request' ? 'CALL BACK' : 'New Order'}: ${orderData.customer_name || 'Customer'} - ${new Date(orderData.timestamp).toLocaleTimeString('en-US', { timeZone: 'America/New_York' })}${scheduled}`;
 
             const mailOptions = {
                 from: `"${businessName} via Paahi" <${EMAIL_USER}>`,

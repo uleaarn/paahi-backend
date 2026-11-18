@@ -56,10 +56,13 @@ export class OrderState {
      * @param {boolean} [opts.deliveryEnabled]
      * @param {() => Date} [opts.clock]
      */
-    constructor({ callId, menu, deliveryEnabled = false, clock = () => new Date() }) {
+    constructor({ callId, menu, deliveryEnabled = false, clock = () => new Date(), timeZone = 'America/New_York' }) {
         this.menu = menu;
         this.deliveryEnabled = deliveryEnabled;
         this.clock = clock;
+        this.timeZone = timeZone;
+        // Set by the workflow while the business is closed: the order needs a later pickup time.
+        this.requireScheduledTime = false;
         this.nextLine = 1;
         this.version = 0;            // bumps on every change to the order
         this.readbackVersion = null; // version the caller heard read back
@@ -172,6 +175,9 @@ export class OrderState {
         if (found.status !== 'matched') {
             return { ok: false, error: 'item_not_on_menu', requested: item, closest: found.candidates.map(c => c.name) };
         }
+        const when = this.data.requested_time ? new Date(this.data.requested_time) : this.clock();
+        const avail = this.menu.availability(found.item, when, this.timeZone);
+        if (!avail.ok) return avail;
         const qty = this.validateQuantity(quantity);
         if (!qty.ok) return qty;
         const opts = this.resolveLineOptions(found.item, { size, modifiers, spice_level });
@@ -193,6 +199,44 @@ export class OrderState {
         this.data.items.push(line);
         this.touch();
         return { ok: true, added: this.describeLine(line), line_id: line.line_id, subtotal: this.data.subtotal };
+    }
+
+    /**
+     * Record a scheduled pickup time (a Date already checked against opening
+     * hours by the workflow), or null for as soon as possible.
+     * Items that can't be had at that time (e.g. lunch specials) block the change.
+     */
+    setPickupTime(at) {
+        if (this.isLocked()) return this.locked();
+        const when = at || this.clock();
+        const unavailable = this.data.items
+            .map(l => this.menu.availability(this.menu.getItem(l.menu_item_id), when, this.timeZone))
+            .filter(r => !r.ok);
+        if (unavailable.length) {
+            return { ok: false, error: 'items_not_available_at_that_time', items: unavailable.map(u => `${u.item} (${u.available})`) };
+        }
+        const iso = at ? at.toISOString() : null;
+        if (iso !== this.data.requested_time) {
+            this.data.requested_time = iso;
+            this.touch();
+        }
+        return { ok: true, pickup_time: iso ? this.pickupLabel('en') : 'as soon as possible' };
+    }
+
+    /** "today at 7:00 PM" / "tomorrow at 12:30 PM" / "Friday, November 20 at 6:00 PM", in the call language. */
+    pickupLabel(language = 'en') {
+        if (!this.data.requested_time) return null;
+        const p = phrases(language);
+        const at = new Date(this.data.requested_time);
+        const tz = this.timeZone;
+        const dayOf = d => new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(d);
+        const today = dayOf(this.clock());
+        const tomorrow = dayOf(new Date(this.clock().getTime() + 86400000));
+        const time = new Intl.DateTimeFormat(p.locale, { timeZone: tz, hour: 'numeric', minute: '2-digit' }).format(at);
+        const day = dayOf(at) === today ? p.today
+            : dayOf(at) === tomorrow ? p.tomorrow
+                : new Intl.DateTimeFormat(p.locale, { timeZone: tz, weekday: 'long', month: 'long', day: 'numeric' }).format(at);
+        return p.dayAt(day, time);
     }
 
     findLine(lineId) {
@@ -278,6 +322,7 @@ export class OrderState {
     missingFields() {
         const missing = [];
         if (this.data.intent !== 'pickup' && this.data.intent !== 'delivery') missing.push('order_type');
+        if (this.requireScheduledTime && !this.data.requested_time) missing.push('pickup_time');
         if (this.data.items.length === 0) missing.push('items');
         if (!this.data.customer.name) missing.push('customer_name');
         if (!this.data.customer.phone) missing.push('customer_phone');
@@ -313,6 +358,7 @@ export class OrderState {
             notes: this.data.order_notes,
             allergy: this.data.allergy_notes,
             address: type === 'delivery' ? c.delivery_address : null,
+            when: this.pickupLabel(language),
             subtotal: p.money(this.data.subtotal),
             phone: speakPhone(c.phone),
         }).filter(Boolean);
@@ -385,6 +431,7 @@ export class OrderState {
         return {
             phase: this.phase,
             order_type: this.data.intent,
+            pickup_time: this.data.requested_time ? this.pickupLabel('en') : 'as soon as possible',
             items: this.data.items.map(l => ({ line_id: l.line_id, text: this.describeLine(l), line_total: l.line_total })),
             subtotal: this.data.subtotal,
             customer: {

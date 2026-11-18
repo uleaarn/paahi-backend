@@ -10,7 +10,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { MenuService, openStatus } from './menu-service.js';
+import { MenuService, openStatus, checkPickupTime, nextOpening } from './menu-service.js';
 import { OrderState, PHASES, isExplicitConfirmation, normalizePhone } from './order-state.js';
 import { BusinessRegistry } from './business-registry.js';
 import { createConversation, actionsFactory } from './call-factory.js';
@@ -20,7 +20,7 @@ import { createDevDatabase } from './dev-database.js';
 import { TextToSpeech } from './tts.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const menuData = JSON.parse(fs.readFileSync(path.join(__dirname, 'businesses', 'jalwa-montclair', 'menu.json'), 'utf-8'));
+const menuData = JSON.parse(fs.readFileSync(path.join(__dirname, 'test-fixtures', 'sample-menu.json'), 'utf-8'));
 const menu = new MenuService(menuData);
 
 // Tuesday 2026-11-17, 1:00 PM New York (open) and 4:00 PM (closed between lunch and dinner)
@@ -370,7 +370,7 @@ function makeFixtureRoot({ mutateJalwa, extra } = {}) {
     jalwa.phone_numbers = [JALWA_NUMBER];
     if (mutateJalwa) mutateJalwa(jalwa);
     fs.writeFileSync(path.join(jalwaDir, 'business.json'), JSON.stringify(jalwa));
-    fs.copyFileSync(path.join(__dirname, 'businesses', 'jalwa-montclair', 'menu.json'), path.join(jalwaDir, 'menu.json'));
+    fs.copyFileSync(path.join(__dirname, 'test-fixtures', 'sample-menu.json'), path.join(jalwaDir, 'menu.json'));
 
     const harborDir = path.join(root, 'harbor-cafe');
     fs.mkdirSync(harborDir);
@@ -465,12 +465,13 @@ function fakeEmailService() {
     };
 }
 
-async function newEngine(script, { clock = OPEN_TIME, submitter, callerPhone = null, languages, dialed = JALWA_NUMBER } = {}) {
+async function newEngine(script, { clock = OPEN_TIME, submitter, callerPhone = null, languages, dialed = JALWA_NUMBER, mutateJalwa } = {}) {
     const emailService = fakeEmailService();
     const notifier = new Notifier({ db, emailService, logger: quiet });
     const make = actionsFactory({ db, notifier, emailService, logger: quiet });
     const actions = {};
     const registry = buildRegistry({
+        root: makeFixtureRoot({ mutateJalwa }),
         languages,
         // Jalwa's business.json names EMAIL_TO as its staff email.
         env: { EMAIL_TO: 'kitchen@jalwa.test' },
@@ -561,15 +562,105 @@ test('a qualified "yes, but..." does not submit', async () => {
     assert.notEqual(order.phase, PHASES.SUBMITTED);
 });
 
-test('business closed: order tools are blocked', async () => {
+test('business closed, no scheduled orders: order tools are blocked', async () => {
     const { engine, order } = await newEngine([
         toolsMsg(toolCall('add_item', { item: 'naan' })),
         textMsg("We're closed right now; we reopen at five."),
-    ], { clock: CLOSED_TIME });
+    ], { clock: CLOSED_TIME, mutateJalwa: b => { delete b.workflows.restaurant_ordering.scheduled_orders; } });
     assert.equal(openStatus(engine.location.hours, CLOSED_TIME()).open, false);
     await engine.handleUtterance('one naan please');
     assert.equal(order.data.items.length, 0);
-    assert.ok(engine.events.some(e => e.type === 'tool' && e.error === 'business_closed'));
+    const blocked = engine.events.find(e => e.type === 'tool' && e.error === 'business_closed');
+    assert.ok(blocked);
+    assert.ok(!engine.workflows[0].tools.some(t => t.function.name === 'set_pickup_time'), 'no scheduling tool offered');
+});
+
+test('business closed, scheduled orders on: order is taken for a pickup time after opening', async () => {
+    const { engine, order, emails, actions, callId } = await newEngine([
+        toolsMsg(toolCall('add_item', { item: 'butter chicken' })),
+        textMsg("We open at five. What time would you like to pick up?"),
+        toolsMsg(toolCall('set_pickup_time', { asap: true })),
+        textMsg("We're closed until five. What time after five works?"),
+        toolsMsg(toolCall('set_pickup_time', { date: '2026-11-17', time: '16:30' })),
+        textMsg("We're closed then. How about five or later?"),
+        toolsMsg(toolCall('set_pickup_time', { date: '2026-11-17', time: '17:00' })),
+        textMsg('Five o\'clock it is. Name for the order?'),
+        toolsMsg(toolCall('set_customer', { name: 'Babu', phone: '973 555 1234' }), toolCall('read_back_order')),
+        toolsMsg(toolCall('confirm_and_submit_order')),
+    ], { clock: CLOSED_TIME });
+    // Closed: the model is told when it opens next, and that it may schedule.
+    await engine.handleUtterance('one butter chicken for later');
+    const prompt = engine.systemPrompt('x');
+    assert.match(prompt, /CLOSED\..*Next opening: Tuesday 5:00 PM/);
+    assert.match(prompt, /Today is tuesday 2026-11-17/);
+    assert.equal(order.data.items.length, 1, 'item added while closed');
+    assert.deepEqual(order.missingFields(), ['pickup_time', 'customer_name', 'customer_phone']);
+
+    await engine.handleUtterance('as soon as possible');
+    assert.ok(engine.events.some(e => e.type === 'tool' && e.error === 'closed_now'));
+    await engine.handleUtterance('four thirty');
+    assert.ok(engine.events.some(e => e.type === 'tool' && e.error === 'outside_opening_hours'));
+    await engine.handleUtterance('five then');
+    assert.equal(order.data.requested_time, '2026-11-17T22:00:00.000Z');
+
+    const rb = await engine.handleUtterance('Babu, 973 555 1234');
+    assert.match(rb.say, /A pickup order for Babu: one Butter Chicken\. Pickup today at 5:00 PM\./);
+    const done = await engine.handleUtterance('Yes, that is right');
+    assert.equal(done.endCall, true);
+    const saved = (await raw.query('select pickup_at from public.orders where call_sid = $1', [callId])).rows;
+    assert.equal(new Date(saved[0].pickup_at).toISOString(), '2026-11-17T22:00:00.000Z');
+    await actions.lastDelivery;
+    assert.match(emails[0].msg.order_summary, /SCHEDULED for Tuesday, Nov 17, 5:00 PM/);
+    assert.equal(emails[0].msg.pickup_time, 'Tuesday, Nov 17, 5:00 PM');
+});
+
+test('scheduled pickup times are checked against hours, lead time and how far ahead', () => {
+    const hours = JSON.parse(fs.readFileSync(path.join(__dirname, 'businesses', 'jalwa-montclair', 'business.json'), 'utf-8')).locations[0].hours;
+    const opts = { now: CLOSED_TIME(), timeZone: 'America/New_York', minLeadMinutes: 20, maxDaysAhead: 7 };
+    assert.equal(checkPickupTime(hours, { date: '2026-11-17', time: '19:00' }, opts).ok, true);
+    assert.equal(checkPickupTime(hours, { date: '2026-11-18', time: '12:00' }, opts).ok, true, 'tomorrow lunch');
+    assert.equal(checkPickupTime(hours, { date: '2026-11-17', time: '16:10' }, opts).error, 'too_soon');
+    assert.equal(checkPickupTime(hours, { date: '2026-11-17', time: '16:30' }, opts).error, 'outside_opening_hours');
+    assert.equal(checkPickupTime(hours, { date: '2026-11-17', time: '22:25' }, opts).error, 'outside_opening_hours', 'not right at closing');
+    assert.equal(checkPickupTime(hours, { date: '2026-11-30', time: '12:00' }, opts).error, 'too_far_ahead');
+    assert.equal(checkPickupTime(hours, { date: 'tomorrow', time: '7pm' }, opts).error, 'invalid_time_format');
+    assert.equal(nextOpening(hours, CLOSED_TIME(), 'America/New_York').toISOString(), '2026-11-17T22:00:00.000Z');
+});
+
+// ------------------------------------------------------------ Jalwa's real menu
+
+const jalwaMenu = new MenuService(JSON.parse(fs.readFileSync(path.join(__dirname, 'businesses', 'jalwa-montclair', 'menu.json'), 'utf-8')));
+
+test('Jalwa menu: dish names are found however the caller says them', () => {
+    const name = q => jalwaMenu.findItem(q).item?.name;
+    assert.equal(name('Aloo Tikki with Pindi Choley'), 'Aloo Tikki With Pindi Cholley');
+    assert.equal(name('aloo tikki'), 'Aloo Tikki With Pindi Cholley');
+    assert.equal(name('aloo tikki chole'), 'Aloo Tikki With Pindi Cholley');
+    assert.equal(name('pindi chole'), 'Pindi Cholley', 'the entree, not the starter that also contains it');
+    assert.equal(name('pindi chhole'), 'Pindi Cholley');
+    assert.equal(name('saag paneer'), 'Palak Paneer');
+    assert.equal(name('chicken tika masala'), 'Chicken Tikka Masala');
+    assert.equal(name('garlic nan'), 'Garlic Naan');
+    assert.equal(name('panner tikka'), 'Paneer Tikka');
+    assert.equal(jalwaMenu.findItem('naan').status, 'ambiguous');
+    assert.equal(jalwaMenu.findItem('butter chicken').status, 'ambiguous');
+    assert.equal(jalwaMenu.findItem('pepperoni pizza').status, 'not_found');
+    const starter = jalwaMenu.getItem(jalwaMenu.findItem('aloo tikki').item.id);
+    assert.equal(starter.base_price, 14);
+});
+
+test('Jalwa menu: lunch specials only for Mon-Thu lunch, including scheduled pickups', () => {
+    const at = iso => () => new Date(iso);
+    const tueLunch = new OrderState({ callId: 'CA_l1', menu: jalwaMenu, clock: at('2026-11-17T17:00:00Z') }); // Tue 12:00
+    assert.equal(tueLunch.addItem({ item: 'palak paneer lunch special' }).ok, true);
+    // Moving that order to Friday evening is refused while it holds a lunch special.
+    const r = tueLunch.setPickupTime(new Date('2026-11-20T23:00:00Z'));
+    assert.equal(r.error, 'items_not_available_at_that_time');
+    const saturday = new OrderState({ callId: 'CA_l2', menu: jalwaMenu, clock: at('2026-11-21T17:00:00Z') });
+    const sat = saturday.addItem({ item: 'palak paneer lunch special' });
+    assert.equal(sat.error, 'not_available_at_that_time');
+    assert.match(sat.available, /monday, tuesday, wednesday, thursday 11:30 AM - 3:00 PM/);
+    assert.equal(saturday.addItem({ item: 'palak paneer' }).ok, true);
 });
 
 test('allergy mention adds a safety note to the model prompt', async () => {
