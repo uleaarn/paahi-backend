@@ -9,11 +9,18 @@
  *
  * If the chosen provider fails and another configured provider can speak the
  * same language, that one is tried before giving up.
+ *
+ * Speed: stream() hands audio to the caller piece by piece as Deepgram
+ * produces it, so playback starts within a fraction of a second instead of
+ * after the whole reply is generated. Short repeated lines (greetings,
+ * goodbyes) are cached in memory and play instantly.
  */
 import mulaw from 'alawmulaw';
 import { LANGUAGES } from './languages.js';
 
 const DEEPGRAM_SPEAK_URL = 'https://api.deepgram.com/v1/speak';
+const CACHE_MAX_ENTRIES = 200;
+const CACHE_MAX_TEXT = 300; // only cache short lines; long replies are rarely repeated
 
 function pcm16ToMulaw(pcm16Buffer) {
     const aligned = Buffer.from(pcm16Buffer);
@@ -37,6 +44,17 @@ export class TextToSpeech {
     constructor({ deepgramKey = null, googleClient = null, fetchImpl = globalThis.fetch, timeoutMs = 8000, logger = console }) {
         Object.assign(this, { deepgramKey, googleClient, fetch: fetchImpl, timeoutMs });
         this.log = logger;
+        this.cache = new Map(); // key -> Buffer (insertion order = age)
+    }
+
+    cacheKey(voice, text) {
+        return `${voice.provider}|${voice.voice}|${text}`;
+    }
+
+    remember(key, audio) {
+        if (this.cache.has(key)) this.cache.delete(key);
+        this.cache.set(key, audio);
+        while (this.cache.size > CACHE_MAX_ENTRIES) this.cache.delete(this.cache.keys().next().value);
     }
 
     available(provider) {
@@ -62,9 +80,12 @@ export class TextToSpeech {
         return business.languages.enabled.filter(code => !this.voicesFor(business, code).some(v => this.available(v.provider)));
     }
 
-    async deepgram(text, voice) {
+    /** Stream Deepgram Aura audio; onChunk(Buffer) is called as pieces arrive. */
+    async deepgramStream(text, voice, onChunk) {
         const controller = new AbortController();
+        // The timeout covers the wait for the first audio; once audio flows, it keeps flowing.
         const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+        let total = 0;
         try {
             const url = `${DEEPGRAM_SPEAK_URL}?model=${encodeURIComponent(voice.voice)}&encoding=mulaw&sample_rate=8000&container=none`;
             const res = await this.fetch(url, {
@@ -77,11 +98,22 @@ export class TextToSpeech {
                 const detail = await res.text().catch(() => '');
                 throw new Error(`Deepgram TTS HTTP ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`);
             }
-            const audio = Buffer.from(await res.arrayBuffer());
-            if (audio.length === 0) throw new Error('Deepgram TTS returned no audio');
-            return audio;
+            if (res.body && typeof res.body[Symbol.asyncIterator] === 'function') {
+                for await (const piece of res.body) {
+                    clearTimeout(timer);
+                    const buf = Buffer.from(piece);
+                    if (buf.length) { total += buf.length; await onChunk(buf); }
+                }
+            } else {
+                const buf = Buffer.from(await res.arrayBuffer());
+                if (buf.length) { total += buf.length; await onChunk(buf); }
+            }
+            if (total === 0) throw new Error('Deepgram TTS returned no audio');
+            return total;
         } catch (error) {
-            throw error.name === 'AbortError' ? new Error('Deepgram TTS timed out') : error;
+            const e = error.name === 'AbortError' ? new Error('Deepgram TTS timed out') : error;
+            e.audioSent = total > 0;
+            throw e;
         } finally {
             clearTimeout(timer);
         }
@@ -99,22 +131,49 @@ export class TextToSpeech {
     }
 
     /**
-     * @returns {Promise<{ audio: Buffer, provider: string, voice: string, ms: number, fellBack: boolean }>}
+     * Speak `text`, handing μ-law audio to onChunk as soon as it exists.
+     * Falls back to the next provider only if nothing has been played yet.
+     * @returns {Promise<{ provider, voice, firstAudioMs, ms, bytes, fellBack, cached }>}
      */
-    async synthesize(text, { business, language }) {
+    async stream(text, { business, language }, onChunk) {
         const errors = [];
         const voices = this.voicesFor(business, language).filter(v => this.available(v.provider));
         if (voices.length === 0) throw new Error(`no configured voice for language ${language}`);
         for (const [i, voice] of voices.entries()) {
             const started = Date.now();
+            const key = this.cacheKey(voice, text);
+            const cached = this.cache.get(key);
+            if (cached) {
+                await onChunk(cached);
+                return { provider: voice.provider, voice: voice.voice, firstAudioMs: 0, ms: 0, bytes: cached.length, fellBack: i > 0, cached: true };
+            }
+            let firstAudioMs = null;
+            const pieces = [];
+            const deliver = async (buf) => {
+                if (firstAudioMs === null) firstAudioMs = Date.now() - started;
+                if (text.length <= CACHE_MAX_TEXT) pieces.push(buf);
+                await onChunk(buf);
+            };
             try {
-                const audio = voice.provider === 'deepgram' ? await this.deepgram(text, voice) : await this.google(text, voice);
-                return { audio, provider: voice.provider, voice: voice.voice, ms: Date.now() - started, fellBack: i > 0 };
+                if (voice.provider === 'deepgram') await this.deepgramStream(text, voice, deliver);
+                else await deliver(await this.google(text, voice));
+                const bytes = pieces.reduce((n, b) => n + b.length, 0);
+                if (text.length <= CACHE_MAX_TEXT && bytes) this.remember(key, Buffer.concat(pieces));
+                return { provider: voice.provider, voice: voice.voice, firstAudioMs, ms: Date.now() - started, bytes, fellBack: i > 0, cached: false };
             } catch (error) {
                 errors.push(`${voice.provider}: ${error.message}`);
                 this.log.error(`❌ TTS ${voice.provider} failed: ${error.message}`);
+                // Part of the reply was already played; don't start it over in another voice.
+                if (error.audioSent || firstAudioMs !== null) throw new Error(errors.join(' | '));
             }
         }
         throw new Error(errors.join(' | '));
+    }
+
+    /** Whole reply as one buffer (used by tests and tools). */
+    async synthesize(text, opts) {
+        const parts = [];
+        const r = await this.stream(text, opts, async b => { parts.push(b); });
+        return { ...r, audio: Buffer.concat(parts) };
     }
 }

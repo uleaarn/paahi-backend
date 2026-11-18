@@ -735,3 +735,47 @@ test('voice: startup check names languages that have no configured voice', () =>
     assert.deepEqual(tts.missingVoices({ languages: { enabled: ['en'], voices: {} } }), []);
     assert.deepEqual(tts.missingVoices({ languages: { enabled: ['en', 'hi', 'te'], voices: {} } }), ['hi', 'te']);
 });
+
+test('voice: audio is handed over piece by piece as it streams, then cached for repeats', async () => {
+    let requests = 0;
+    const fetchImpl = async () => {
+        requests++;
+        async function* body() { yield new Uint8Array(300).fill(1); yield new Uint8Array(200).fill(2); }
+        return { ok: true, status: 200, body: body() };
+    };
+    const tts = new TextToSpeech({ deepgramKey: 'dg', fetchImpl, logger: quiet });
+    const opts = { business: { languages: { voices: {} } }, language: 'en' };
+    const chunks = [];
+    const r = await tts.stream('Thank you for calling Jalwa.', opts, async c => chunks.push(c.length));
+    assert.deepEqual(chunks, [300, 200], 'two pieces delivered as they arrived');
+    assert.equal(r.cached, false);
+    assert.equal(typeof r.firstAudioMs, 'number');
+
+    const again = [];
+    const r2 = await tts.stream('Thank you for calling Jalwa.', opts, async c => again.push(c.length));
+    assert.equal(r2.cached, true);
+    assert.deepEqual(again, [500], 'repeat line plays from memory');
+    assert.equal(requests, 1, 'no second request to Deepgram');
+});
+
+test('voice: a failure after audio already played does not restart in another voice', async () => {
+    const fetchImpl = async () => {
+        async function* body() { yield new Uint8Array(160); throw new Error('connection reset'); }
+        return { ok: true, status: 200, body: body() };
+    };
+    let googleUsed = false;
+    const googleClient = { synthesizeSpeech: async () => { googleUsed = true; return [{ audioContent: Buffer.alloc(4) }]; } };
+    const tts = new TextToSpeech({ deepgramKey: 'dg', googleClient, fetchImpl, logger: quiet });
+    await assert.rejects(tts.stream('A longer reply that fails halfway', { business: { languages: { voices: {} } }, language: 'en' }, async () => {}), /connection reset/);
+    assert.equal(googleUsed, false);
+});
+
+test('prompt: pickup-only business never asks pickup or delivery; short replies; closed rule', async () => {
+    const { engine, llm } = await newEngine([textMsg('Sure, what would you like?')]);
+    await engine.handleUtterance('I want to order');
+    const prompt = llm.requests[0].messages[0].content;
+    assert.match(prompt, /Every phone order is pickup; it's already set\. Never ask about pickup or delivery\./);
+    assert.doesNotMatch(prompt, /ask whether it's for pickup/);
+    assert.match(prompt, /about 25 words at most/);
+    assert.match(prompt, /If the business details below say CLOSED, say so in one sentence/);
+});
