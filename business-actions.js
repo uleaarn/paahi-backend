@@ -75,8 +75,8 @@ export class BusinessActions {
                 const inserted = await tx.query(
                     `insert into public.orders
                         (business_id, location_id, call_sid, idempotency_key, order_type, customer_name, customer_phone,
-                         delivery_address, items, subtotal, order_notes, allergy_notes, language, confirmed_at)
-                     values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14)
+                         delivery_address, items, subtotal, order_notes, allergy_notes, language, confirmed_at, pickup_at)
+                     values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15)
                      on conflict (business_id, idempotency_key) do nothing
                      returning id`,
                     [this.business.id, locationId, order.call_id, idempotencyKey, order.intent,
@@ -87,7 +87,7 @@ export class BusinessActions {
                             allergy_notes: l.allergy_notes, special_instructions: l.special_instructions, line_total: l.line_total,
                         }))),
                         order.subtotal, order.order_notes, order.allergy_notes, language || 'en',
-                        order.confirmed_at || new Date().toISOString()]);
+                        order.confirmed_at || new Date().toISOString(), order.requested_time || null]);
                 if (inserted.rows.length === 0) {
                     const existing = await tx.query(
                         'select id from public.orders where business_id = $1 and idempotency_key = $2', [this.business.id, idempotencyKey]);
@@ -180,8 +180,16 @@ function itemsText(items) {
 }
 
 /** Message for staff. Keeps the flat fields the email template uses. */
+/** "Thursday, Nov 19, 7:00 PM" in the business's time zone. */
+function pickupText(business, at) {
+    return new Intl.DateTimeFormat('en-US', {
+        timeZone: business.timezone || 'America/New_York', weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+    }).format(new Date(at));
+}
+
 export function orderMessage(business, o) {
     const text = itemsText(o.items);
+    const pickup = o.pickup_at ? pickupText(business, o.pickup_at) : null;
     return {
         type: 'order',
         business_id: business.id,
@@ -194,10 +202,12 @@ export function orderMessage(business, o) {
         customer_name: o.customer_name,
         customer_phone: formatPhone(o.customer_phone),
         delivery_address: o.delivery_address,
+        pickup_time: pickup || 'ASAP',
         items: text,
         subtotal: Number(o.subtotal),
         order_summary: [
             `${o.order_type === 'delivery' ? 'DELIVERY' : 'PICKUP'} order`,
+            pickup ? `SCHEDULED for ${pickup}` : 'Pickup: as soon as possible',
             `Items: ${text}`,
             o.order_notes ? `Notes: ${o.order_notes}` : null,
             o.allergy_notes ? `ALLERGY: ${o.allergy_notes}` : null,

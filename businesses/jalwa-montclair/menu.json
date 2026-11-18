@@ -1,1781 +1,2568 @@
 {
-    "categories": [
+  "source": "https://jalwaindianrestaurant.com/menu",
+  "retrieved": "2026-11-18",
+  "notes": "Regular menu only. Catering trays are handled by staff (request_human). No spice-level options are listed on the restaurant menu, so none are offered.",
+  "categories": [
+    {
+      "name": "Lunch Specials",
+      "description": "Lunch specials come with a starter, basmati rice, dal of the day, salad and dessert of the day.",
+      "items": [
         {
-            "name": "Vegetarian Appetizers",
-            "description": "Fresh vegetarian starters and small plates",
-            "items": [
-                {
-                    "id": "veg_app_001",
-                    "name": "Vegetable Samosa",
-                    "description": "Crispy turnovers stuffed with seasoned potatoes and green peas",
-                    "base_price": 8.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 8.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mint_chutney",
-                        "tamarind_chutney"
-                    ],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": false
-                },
-                {
-                    "id": "veg_app_002",
-                    "name": "Samosa Chaat",
-                    "description": "Crispy samosas with spiced chickpeas, yogurt, tamarind and mint chutney topped with potato sev",
-                    "base_price": 9.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 9.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "no_yogurt",
-                        "no_onion"
-                    ],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": false
-                },
-                {
-                    "id": "veg_app_003",
-                    "name": "Palak Chaat",
-                    "description": "Crispy spinach with pomegranate, yogurt, tamarind chutney, mint chutney, tomatoes and onions",
-                    "base_price": 12.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 12.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "no_yogurt",
-                        "no_onion"
-                    ],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "veg_app_004",
-                    "name": "Paneer Beetroot Tikki",
-                    "description": "Cream cheese, yogurt, beetroot and potato crisps",
-                    "base_price": 12.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 12.0
-                        }
-                    ],
-                    "modifiers": [
-                        "mint_chutney"
-                    ],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": false
-                },
-                {
-                    "id": "veg_app_006",
-                    "name": "Achari Mushroom",
-                    "description": "Chargrilled mushrooms marinated in robust pickle seasoning",
-                    "base_price": 12.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 12.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": true,
-                    "gluten_free": true,
-                    "spicy": true
-                },
-                {
-                    "id": "veg_app_007",
-                    "name": "Broccoli Tikka",
-                    "description": "Broccoli crowns marinated with spices and cooked in clay oven",
-                    "base_price": 12.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 12.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": true,
-                    "gluten_free": true
-                },
-                {
-                    "id": "veg_app_008",
-                    "name": "Pudina Paneer Tikka",
-                    "description": "Cottage cheese marinated with yogurt, cream, turmeric and Indian spices",
-                    "base_price": 13.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 13.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "veg_app_010",
-                    "name": "Fig Naan and Eggplant Dip",
-                    "description": "Fluffy naan served with spiced eggplant mash and figs",
-                    "base_price": 12.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 12.0
-                        }
-                    ],
-                    "modifiers": [
-                        "garlic_naan"
-                    ],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": false
-                }
-            ]
+          "id": "lunch_malai_kofta_lunch_special",
+          "name": "Malai Kofta Lunch Special",
+          "description": "Mixed vegetable and cheese dumplings in a rich saffron sauce",
+          "base_price": 16.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 16.0
+            }
+          ],
+          "modifiers": [
+            "garlic_naan",
+            "onion_kulcha"
+          ]
         },
         {
-            "name": "Non-Vegetarian Appetizers",
-            "description": "Meat and seafood starters",
-            "items": [
-                {
-                    "id": "nonveg_app_001",
-                    "name": "Chicken Tikka Sizzler",
-                    "description": "Tandoori chicken tikka strips pan-fried with cumin, bell peppers, tomatoes and onions",
-                    "base_price": 12.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 12.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "nonveg_app_002",
-                    "name": "Lollipop Chicken",
-                    "description": "Chicken drumsticks marinated with garlic, ginger, black pepper, cooked in tandoor",
-                    "base_price": 12.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 12.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "nonveg_app_003",
-                    "name": "Achari Chicken Tikka",
-                    "description": "Chicken pieces marinated in pickle seasoning",
-                    "base_price": 12.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 12.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": false,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true,
-                    "spicy": true
-                },
-                {
-                    "id": "nonveg_app_004",
-                    "name": "Chicken Tikka Trio",
-                    "description": "Tasting trio of hariyali kabab, malai kabab and chicken tikka",
-                    "base_price": 12.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 12.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "nonveg_app_005",
-                    "name": "Chicken Reshmi Kabab",
-                    "description": "Boneless chicken marinated in gram flour, ginger, garlic and cardamom",
-                    "base_price": 12.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 12.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": false
-                },
-                {
-                    "id": "nonveg_app_006",
-                    "name": "Chicken Bao Buns",
-                    "description": "Soft bao buns with tender chicken in rich bhuna masala, truffle oil, cilantro and tamarind chutney",
-                    "base_price": 13.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 13.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": false
-                },
-                {
-                    "id": "nonveg_app_007",
-                    "name": "Lamb Sliders",
-                    "description": "Lamb patties served on mini mughlai parantha",
-                    "base_price": 12.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 12.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": false,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": false
-                },
-                {
-                    "id": "nonveg_app_008",
-                    "name": "Calamari Masala",
-                    "description": "Calamari fried and tossed with onions and peppers in spicy tomato masala",
-                    "base_price": 13.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 13.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": false,
-                    "spicy": true
-                },
-                {
-                    "id": "nonveg_app_009",
-                    "name": "Blue Crab Saffron",
-                    "description": "Fresh blue crab in rich saffron-infused butter and garlic with black pepper",
-                    "base_price": 14.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 14.0
-                        }
-                    ],
-                    "modifiers": [],
-                    "popular": false,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "nonveg_app_010",
-                    "name": "Baby Goat Sukha",
-                    "description": "Tender baby goat slow-cooked with aromatic spices and caramelized onions",
-                    "base_price": 15.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 15.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": false,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                }
-            ]
+          "id": "lunch_chicken_vindaloo_lunch_special",
+          "name": "Chicken Vindaloo Lunch Special",
+          "description": "Chicken in a chili, vinegar and garlic gravy, not for the faint-hearted",
+          "base_price": 17.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 17.0
+            }
+          ],
+          "modifiers": [
+            "garlic_naan",
+            "onion_kulcha"
+          ]
         },
         {
-            "name": "Vegetarian Entrees",
-            "description": "Main course vegetarian dishes served with basmati rice",
-            "items": [
-                {
-                    "id": "veg_entree_001",
-                    "name": "Gobi Aloo",
-                    "description": "Cauliflower and potato cubes with ginger, turmeric and spices",
-                    "base_price": 17.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 17.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": true,
-                    "gluten_free": true
-                },
-                {
-                    "id": "veg_entree_003",
-                    "name": "Chana Masala",
-                    "description": "Chickpeas cooked with onions, garlic, ginger and spices",
-                    "base_price": 17.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 17.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": true,
-                    "gluten_free": true
-                },
-                {
-                    "id": "veg_entree_004",
-                    "name": "Mixed Vegetable Jalfrezi",
-                    "description": "Fresh vegetables with onion, tomatoes, peppers, paneer and spices",
-                    "base_price": 17.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 17.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild",
-                        "no_paneer"
-                    ],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "veg_entree_005",
-                    "name": "Navratan Korma",
-                    "description": "Mixed vegetables in silky cashew korma sauce",
-                    "base_price": 17.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 17.0
-                        }
-                    ],
-                    "modifiers": [
-                        "mild"
-                    ],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "veg_entree_006",
-                    "name": "Baingan Bharta",
-                    "description": "Charcoal grilled eggplant with onions, tomatoes, ginger and cilantro",
-                    "base_price": 17.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 17.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": true,
-                    "gluten_free": true
-                },
-                {
-                    "id": "veg_entree_007",
-                    "name": "Bagara Baingan",
-                    "description": "Baby eggplant and chilis with ginger, garlic and mustard seeds",
-                    "base_price": 17.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 17.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": true,
-                    "gluten_free": true,
-                    "spicy": true
-                },
-                {
-                    "id": "veg_entree_008",
-                    "name": "Palak Paneer",
-                    "description": "Fresh creamed spinach with cubes of homemade cottage cheese",
-                    "base_price": 18.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 18.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "veg_entree_009",
-                    "name": "Paneer Tikka Masala",
-                    "description": "Cottage cheese in mildly spiced tomato onion gravy with peppers and cilantro",
-                    "base_price": 18.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 18.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "veg_entree_010",
-                    "name": "Paneer Kadai",
-                    "description": "Cottage cheese cooked in wok with bell peppers and tomatoes",
-                    "base_price": 18.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 18.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "veg_entree_011",
-                    "name": "Paneer Makhani",
-                    "description": "Cottage cheese in creamy tomato gravy",
-                    "base_price": 18.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 18.0
-                        }
-                    ],
-                    "modifiers": [
-                        "mild",
-                        "less_cream"
-                    ],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "veg_entree_012",
-                    "name": "Paneer Methi Malai",
-                    "description": "Mint cottage cheese triangles in creamy fenugreek and cardamom gravy",
-                    "base_price": 18.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 18.0
-                        }
-                    ],
-                    "modifiers": [
-                        "mild"
-                    ],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "veg_entree_013",
-                    "name": "Malai Kofta",
-                    "description": "Vegetable and cheese dumplings in rich cashew sauce",
-                    "base_price": 18.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 18.0
-                        }
-                    ],
-                    "modifiers": [
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": false
-                },
-                {
-                    "id": "veg_entree_014",
-                    "name": "Baingan Mussakka",
-                    "description": "Eggplant rounds with onions, tomatoes, garlic yogurt and pomegranate",
-                    "base_price": 18.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 18.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild",
-                        "no_yogurt"
-                    ],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "veg_entree_015",
-                    "name": "Dal Bukhara",
-                    "description": "Black lentils cooked slowly, famous dish from ITC Bukhara Delhi",
-                    "base_price": 17.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 17.0
-                        }
-                    ],
-                    "modifiers": [
-                        "mild",
-                        "extra_cream"
-                    ],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": true
-                }
-            ]
+          "id": "lunch_chicken_tikka_masala_lunch_special",
+          "name": "Chicken Tikka Masala Lunch Special",
+          "description": "Chicken cooked in mildly spiced tomato sauce with peppers and onions",
+          "base_price": 17.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 17.0
+            }
+          ],
+          "modifiers": [
+            "garlic_naan",
+            "onion_kulcha"
+          ]
         },
         {
-            "name": "Chicken Entrees",
-            "description": "Chicken main courses served with basmati rice",
-            "items": [
-                {
-                    "id": "chicken_001",
-                    "name": "Chicken Tikka Masala",
-                    "description": "Most popular! Chicken in mildly spiced tomato sauce with peppers, onions and cilantro",
-                    "base_price": 19.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 19.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild",
-                        "extra_sauce"
-                    ],
-                    "popular": true,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "chicken_002",
-                    "name": "Chicken Kadai",
-                    "description": "Chicken sauteed in wok with peppers, onions and Indian spices",
-                    "base_price": 19.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 19.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "chicken_003",
-                    "name": "Chicken Vindaloo",
-                    "description": "Homestyle chicken curry with Goan spices and fresh coconut milk",
-                    "base_price": 19.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 19.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": false,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true,
-                    "spicy": true
-                },
-                {
-                    "id": "chicken_004",
-                    "name": "Butter Chicken",
-                    "description": "Chicken on the bone in creamy spicy tomato gravy, Delhi style",
-                    "base_price": 19.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 19.0
-                        }
-                    ],
-                    "modifiers": [
-                        "mild",
-                        "extra_sauce",
-                        "less_cream"
-                    ],
-                    "popular": true,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "chicken_005",
-                    "name": "Chicken Saag",
-                    "description": "Chicken in sweet tender spinach with aromatic spices",
-                    "base_price": 19.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 19.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": false,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "chicken_006",
-                    "name": "Chicken Korma",
-                    "description": "Chicken in special silky korma sauce",
-                    "base_price": 19.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 19.0
-                        }
-                    ],
-                    "modifiers": [
-                        "mild"
-                    ],
-                    "popular": false,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                }
-            ]
+          "id": "lunch_goan_fish_curry_lunch_special",
+          "name": "Goan Fish Curry Lunch Special",
+          "description": "Fish curry cooked with coconut milk and Indian herbs and spices",
+          "base_price": 18.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 18.0
+            }
+          ],
+          "modifiers": [
+            "garlic_naan",
+            "onion_kulcha"
+          ]
         },
         {
-            "name": "Lamb Entrees",
-            "description": "Lamb main courses served with basmati rice",
-            "items": [
-                {
-                    "id": "lamb_001",
-                    "name": "Lamb Korma",
-                    "description": "Tender lamb cubes in special silky korma sauce",
-                    "base_price": 21.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 21.0
-                        }
-                    ],
-                    "modifiers": [
-                        "mild"
-                    ],
-                    "popular": false,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "lamb_002",
-                    "name": "Lamb Rogan Josh",
-                    "description": "Braised lamb with brown onion and Kashmiri spices",
-                    "base_price": 21.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 21.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "lamb_003",
-                    "name": "Lamb Saag",
-                    "description": "Lamb in sweet tender spinach with aromatic spices",
-                    "base_price": 21.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 21.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": false,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "lamb_004",
-                    "name": "Lamb Tikka Masala",
-                    "description": "Lamb in mildly spiced tomato sauce with peppers, onions and cilantro",
-                    "base_price": 21.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 21.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild",
-                        "extra_sauce"
-                    ],
-                    "popular": true,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                }
-            ]
+          "id": "lunch_chicken_makhani_lunch_special",
+          "name": "Chicken Makhani Lunch Special",
+          "description": "Butter chicken: chicken roasted in the clay oven and tossed in a creamy tomato sauce",
+          "base_price": 17.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 17.0
+            }
+          ],
+          "modifiers": [
+            "garlic_naan",
+            "onion_kulcha"
+          ],
+          "aliases": [
+            "butter chicken lunch special",
+            "butter chicken lunch"
+          ]
         },
         {
-            "name": "Goat Entrees",
-            "description": "Goat main courses served with basmati rice",
-            "items": [
-                {
-                    "id": "goat_001",
-                    "name": "Goat Kadai",
-                    "description": "Goat meat stir-cooked in semi-dry brown sauce with caramelized onion",
-                    "base_price": 21.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 21.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "goat_002",
-                    "name": "Goat Curry",
-                    "description": "Goat in onion, tomato and yogurt sauce with ginger, garlic and chilis",
-                    "base_price": 21.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 21.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "goat_003",
-                    "name": "Goat Hara Masala",
-                    "description": "Goat in chili cilantro gravy",
-                    "base_price": 21.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 21.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": false,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true,
-                    "spicy": true
-                }
-            ]
+          "id": "lunch_chicken_korma_lunch_special",
+          "name": "Chicken Korma Lunch Special",
+          "description": "Tender chicken cooked in a creamy saffron sauce with cardamom",
+          "base_price": 17.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 17.0
+            }
+          ],
+          "modifiers": [
+            "garlic_naan",
+            "onion_kulcha"
+          ]
         },
         {
-            "name": "Seafood Entrees",
-            "description": "Seafood main courses served with basmati rice",
-            "items": [
-                {
-                    "id": "seafood_001",
-                    "name": "Fish Goa Curry",
-                    "description": "Goan specialty fish curry with coconut milk and Indian spices",
-                    "base_price": 21.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 21.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "seafood_002",
-                    "name": "Salmon Methi Malai",
-                    "description": "Chef specialty salmon in fenugreek sauce with Indian spices",
-                    "base_price": 23.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 23.0
-                        }
-                    ],
-                    "modifiers": [
-                        "mild",
-                        "extra_sauce"
-                    ],
-                    "popular": true,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "seafood_003",
-                    "name": "Shrimp Tikka Masala",
-                    "description": "Shrimp in mildly spiced tomato sauce with peppers, onions and cilantro",
-                    "base_price": 22.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 22.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild",
-                        "extra_sauce"
-                    ],
-                    "popular": false,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                }
-            ]
+          "id": "lunch_baingan_bharta_lunch_special",
+          "name": "Baingan Bharta Lunch Special",
+          "description": "Charcoal grilled eggplant cooked with onions, tomatoes and ginger",
+          "base_price": 16.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 16.0
+            }
+          ],
+          "modifiers": [
+            "garlic_naan",
+            "onion_kulcha"
+          ]
         },
         {
-            "name": "Tandoori Specialties",
-            "description": "Clay oven grilled specialties served with grilled vegetables",
-            "items": [
-                {
-                    "id": "tandoori_001",
-                    "name": "Tandoori Chicken",
-                    "description": "Chicken marinated with yogurt and spices, cooked in tandoor",
-                    "base_price": 18.0,
-                    "sizes": [
-                        {
-                            "name": "half",
-                            "price": 18.0
-                        },
-                        {
-                            "name": "full",
-                            "price": 32.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "tandoori_002",
-                    "name": "Lamb Chops",
-                    "description": "Lamb chops marinated in ginger and garlic",
-                    "base_price": 26.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 26.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "tandoori_003",
-                    "name": "Tandoori Pomfret",
-                    "description": "Pomfret fish marinated in aromatic spices, cooked in tandoori oven",
-                    "base_price": 24.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 24.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": false,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "tandoori_004",
-                    "name": "Tandoori Mixed Grill",
-                    "description": "Vegetable medley: onions, bell peppers, cottage cheese, broccoli and cauliflower",
-                    "base_price": 22.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 22.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": true
-                }
-            ]
+          "id": "lunch_chicken_methi_lunch_special",
+          "name": "Chicken Methi Lunch Special",
+          "description": "Chicken curry cooked with fresh fenugreek",
+          "base_price": 17.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 17.0
+            }
+          ],
+          "modifiers": [
+            "garlic_naan",
+            "onion_kulcha"
+          ]
         },
         {
-            "name": "Breads",
-            "description": "Freshly baked tandoori breads",
-            "items": [
-                {
-                    "id": "bread_001",
-                    "name": "Naan",
-                    "description": "White flour bread baked in tandoor",
-                    "base_price": 3.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 3.0
-                        }
-                    ],
-                    "modifiers": [
-                        "butter"
-                    ],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": false
-                },
-                {
-                    "id": "bread_002",
-                    "name": "Garlic Naan",
-                    "description": "White flour bread with fresh minced garlic and green chili",
-                    "base_price": 4.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 4.0
-                        }
-                    ],
-                    "modifiers": [
-                        "butter",
-                        "extra_garlic"
-                    ],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": false
-                },
-                {
-                    "id": "bread_003",
-                    "name": "Rosemary Naan",
-                    "description": "White flour bread with fresh rosemary and minced garlic",
-                    "base_price": 4.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 4.0
-                        }
-                    ],
-                    "modifiers": [
-                        "butter"
-                    ],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": false
-                },
-                {
-                    "id": "bread_004",
-                    "name": "Peshawari Naan",
-                    "description": "Specialty bread with minced garlic, onion and fresh mint",
-                    "base_price": 5.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 5.0
-                        }
-                    ],
-                    "modifiers": [
-                        "butter"
-                    ],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": false
-                },
-                {
-                    "id": "bread_005",
-                    "name": "Aloo Paratha",
-                    "description": "Whole wheat bread stuffed with potatoes, onions and chilies",
-                    "base_price": 5.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 5.0
-                        }
-                    ],
-                    "modifiers": [
-                        "butter"
-                    ],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": false
-                },
-                {
-                    "id": "bread_006",
-                    "name": "Kashmiri Naan",
-                    "description": "Flour bread stuffed with raisins and cherry",
-                    "base_price": 5.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 5.0
-                        }
-                    ],
-                    "modifiers": [
-                        "butter"
-                    ],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": false
-                },
-                {
-                    "id": "bread_007",
-                    "name": "Cheese Naan",
-                    "description": "White flour bread stuffed with fresh goat cheese",
-                    "base_price": 5.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 5.0
-                        }
-                    ],
-                    "modifiers": [
-                        "butter",
-                        "garlic"
-                    ],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": false
-                },
-                {
-                    "id": "bread_008",
-                    "name": "Jalapeño Cheese Naan",
-                    "description": "White flour bread with fresh cheese and jalapeños",
-                    "base_price": 5.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 5.0
-                        }
-                    ],
-                    "modifiers": [
-                        "butter",
-                        "extra_jalapeno"
-                    ],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": false
-                },
-                {
-                    "id": "bread_009",
-                    "name": "Onion Kulcha",
-                    "description": "White flour bread stuffed with onions and spices",
-                    "base_price": 4.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 4.0
-                        }
-                    ],
-                    "modifiers": [
-                        "butter"
-                    ],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": false
-                },
-                {
-                    "id": "bread_010",
-                    "name": "Tandoori Roti",
-                    "description": "Whole wheat bread baked in tandoor",
-                    "base_price": 3.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 3.0
-                        }
-                    ],
-                    "modifiers": [
-                        "butter"
-                    ],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": true,
-                    "gluten_free": false
-                },
-                {
-                    "id": "bread_011",
-                    "name": "Bread Basket",
-                    "description": "Combo of 3 house favorites: naan, onion kulcha, tandoori paratha",
-                    "base_price": 12.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 12.0
-                        }
-                    ],
-                    "modifiers": [
-                        "butter"
-                    ],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": false
-                }
-            ]
+          "id": "lunch_lamb_rogan_josh_lunch_special",
+          "name": "Lamb Rogan Josh Lunch Special",
+          "description": "Braised lamb, brown onion, Kashmiri spices",
+          "base_price": 18.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 18.0
+            }
+          ],
+          "modifiers": [
+            "garlic_naan",
+            "onion_kulcha"
+          ]
         },
         {
-            "name": "Rice and Biryani",
-            "description": "Aromatic basmati rice dishes",
-            "items": [
-                {
-                    "id": "rice_001",
-                    "name": "Basmati Rice",
-                    "description": "Naturally aromatic long grain rice",
-                    "base_price": 4.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 4.0
-                        }
-                    ],
-                    "modifiers": [
-                        "cumin_seeds"
-                    ],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": true,
-                    "gluten_free": true
-                },
-                {
-                    "id": "rice_002",
-                    "name": "Vegetable Biryani",
-                    "description": "Aromatic rice with vegetables, herbs and spices, served with raita",
-                    "base_price": 16.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 16.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "rice_003",
-                    "name": "Chicken Biryani",
-                    "description": "Aromatic rice with chicken, served with raita",
-                    "base_price": 18.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 18.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild",
-                        "boneless"
-                    ],
-                    "popular": true,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "rice_004",
-                    "name": "Lamb Biryani",
-                    "description": "Aromatic rice with lamb, served with raita",
-                    "base_price": 21.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 21.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "rice_005",
-                    "name": "Goat Biryani",
-                    "description": "Aromatic rice with goat, served with raita",
-                    "base_price": 21.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 21.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": true,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "rice_006",
-                    "name": "Shrimp Biryani",
-                    "description": "Aromatic rice with shrimp, served with raita",
-                    "base_price": 22.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 22.0
-                        }
-                    ],
-                    "modifiers": [
-                        "extra_spicy",
-                        "mild"
-                    ],
-                    "popular": false,
-                    "vegetarian": false,
-                    "vegan": false,
-                    "gluten_free": true
-                }
-            ]
+          "id": "lunch_palak_paneer_lunch_special",
+          "name": "Palak Paneer Lunch Special",
+          "description": "Cottage cheese sauteed in spinach",
+          "base_price": 16.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 16.0
+            }
+          ],
+          "modifiers": [
+            "garlic_naan",
+            "onion_kulcha"
+          ]
         },
         {
-            "name": "Sides and Accompaniments",
-            "description": "Complementary sides",
-            "items": [
-                {
-                    "id": "side_001",
-                    "name": "Raita",
-                    "description": "Cool yogurt sauce with cucumbers and roasted cumin",
-                    "base_price": 5.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 5.0
-                        }
-                    ],
-                    "modifiers": [],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "side_002",
-                    "name": "Mango Chutney",
-                    "description": "Sweet and tangy mango chutney",
-                    "base_price": 3.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 3.0
-                        }
-                    ],
-                    "modifiers": [],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": true,
-                    "gluten_free": true
-                },
-                {
-                    "id": "side_003",
-                    "name": "Mixed Pickle",
-                    "description": "Traditional Indian pickled vegetables",
-                    "base_price": 3.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 3.0
-                        }
-                    ],
-                    "modifiers": [],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": true,
-                    "gluten_free": true
-                },
-                {
-                    "id": "side_004",
-                    "name": "Papad",
-                    "description": "Crispy lentil wafers",
-                    "base_price": 3.0,
-                    "sizes": [
-                        {
-                            "name": "2 pieces",
-                            "price": 3.0
-                        }
-                    ],
-                    "modifiers": [
-                        "roasted",
-                        "fried"
-                    ],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": true,
-                    "gluten_free": true
-                }
-            ]
+          "id": "lunch_paneer_makhani_lunch_special",
+          "name": "Paneer Makhani Lunch Special",
+          "description": "Fresh cottage cheese cooked in creamy tomato sauce",
+          "base_price": 16.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 16.0
+            }
+          ],
+          "modifiers": [
+            "garlic_naan",
+            "onion_kulcha"
+          ]
         },
         {
-            "name": "Desserts",
-            "description": "Traditional Indian sweets",
-            "items": [
-                {
-                    "id": "dessert_001",
-                    "name": "Kulfi",
-                    "description": "Chef special mouth-refreshing ice cream with Indian flavors",
-                    "base_price": 7.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 7.0
-                        }
-                    ],
-                    "modifiers": [],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "dessert_002",
-                    "name": "Gulab Jamun",
-                    "description": "Deep fried milk dumplings soaked in sweet syrup",
-                    "base_price": 7.0,
-                    "sizes": [
-                        {
-                            "name": "2 pieces",
-                            "price": 7.0
-                        }
-                    ],
-                    "modifiers": [
-                        "warm"
-                    ],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": false
-                },
-                {
-                    "id": "dessert_003",
-                    "name": "Ras Malai",
-                    "description": "Cottage cheese dumplings in sweetened milk sauce",
-                    "base_price": 7.0,
-                    "sizes": [
-                        {
-                            "name": "2 pieces",
-                            "price": 7.0
-                        }
-                    ],
-                    "modifiers": [],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": false
-                }
-            ]
+          "id": "lunch_aloo_gobi_lunch_special",
+          "name": "Aloo Gobi Lunch Special",
+          "description": "Cauliflower and potato sauteed with ginger, turmeric and spices",
+          "base_price": 16.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 16.0
+            }
+          ],
+          "modifiers": [
+            "garlic_naan",
+            "onion_kulcha"
+          ]
         },
         {
-            "name": "Beverages",
-            "description": "Refreshing drinks",
-            "items": [
-                {
-                    "id": "beverage_001",
-                    "name": "Mango Lassi",
-                    "description": "Sweet yogurt drink with mango",
-                    "base_price": 5.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 5.0
-                        },
-                        {
-                            "name": "large",
-                            "price": 7.0
-                        }
-                    ],
-                    "modifiers": [
-                        "less_sugar",
-                        "extra_sweet"
-                    ],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "beverage_002",
-                    "name": "Sweet Lassi",
-                    "description": "Traditional sweet yogurt drink",
-                    "base_price": 5.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 5.0
-                        },
-                        {
-                            "name": "large",
-                            "price": 7.0
-                        }
-                    ],
-                    "modifiers": [
-                        "less_sugar",
-                        "extra_sweet"
-                    ],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "beverage_003",
-                    "name": "Salt Lassi",
-                    "description": "Traditional salted yogurt drink",
-                    "base_price": 5.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 5.0
-                        },
-                        {
-                            "name": "large",
-                            "price": 7.0
-                        }
-                    ],
-                    "modifiers": [],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "beverage_004",
-                    "name": "Masala Chai",
-                    "description": "Traditional Indian spiced tea",
-                    "base_price": 4.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 4.0
-                        }
-                    ],
-                    "modifiers": [
-                        "less_sugar"
-                    ],
-                    "popular": true,
-                    "vegetarian": true,
-                    "vegan": false,
-                    "gluten_free": true
-                },
-                {
-                    "id": "beverage_005",
-                    "name": "Soft Drinks",
-                    "description": "Coke, Diet Coke, Sprite, Ginger Ale",
-                    "base_price": 3.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 3.0
-                        }
-                    ],
-                    "modifiers": [],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": true,
-                    "gluten_free": true
-                },
-                {
-                    "id": "beverage_006",
-                    "name": "Bottled Water",
-                    "description": "Spring water",
-                    "base_price": 2.0,
-                    "sizes": [
-                        {
-                            "name": "regular",
-                            "price": 2.0
-                        }
-                    ],
-                    "modifiers": [],
-                    "popular": false,
-                    "vegetarian": true,
-                    "vegan": true,
-                    "gluten_free": true
-                }
-            ]
+          "id": "lunch_goat_vindaloo_lunch_special",
+          "name": "Goat Vindaloo Lunch Special",
+          "description": "Goat in a chili, vinegar and garlic gravy, not for the faint-hearted",
+          "base_price": 18.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 18.0
+            }
+          ],
+          "modifiers": [
+            "garlic_naan",
+            "onion_kulcha"
+          ]
+        },
+        {
+          "id": "lunch_rara_bhuna_goat_lunch_special",
+          "name": "Rara Bhuna Goat Lunch Special",
+          "description": "Goat stir-cooked in a semi-dry brown sauce with caramelized onion",
+          "base_price": 18.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 18.0
+            }
+          ],
+          "modifiers": [
+            "garlic_naan",
+            "onion_kulcha"
+          ]
+        },
+        {
+          "id": "lunch_shrimp_bhuna_lunch_special",
+          "name": "Shrimp Bhuna Lunch Special",
+          "description": "Shrimp cooked in a wok with garlic, ground spices, peppers and onions",
+          "base_price": 18.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 18.0
+            }
+          ],
+          "modifiers": [
+            "garlic_naan",
+            "onion_kulcha"
+          ]
         }
-    ],
-    "modifiers": {
-        "extra_spicy": {
-            "name": "Extra Spicy",
-            "price": 0,
-            "description": "Increase spice level"
+      ],
+      "available": {
+        "days": [
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday"
+        ],
+        "hours": "11:30 AM - 3:00 PM"
+      }
+    },
+    {
+      "name": "Vegetable Starters",
+      "items": [
+        {
+          "id": "vstart_vegetable_samosa",
+          "name": "Vegetable Samosa",
+          "description": "Crispy turnovers, seasoned potatoes, green peas",
+          "base_price": 9.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 9.0
+            }
+          ],
+          "modifiers": [],
+          "vegetarian": true
         },
-        "mild": {
-            "name": "Mild",
-            "price": 0,
-            "description": "Reduce spice level"
+        {
+          "id": "vstart_lasuni_gobi",
+          "name": "Lasuni Gobi",
+          "description": "Cauliflower florets tossed in a soy burnt garlic sauce",
+          "base_price": 14.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 14.0
+            }
+          ],
+          "modifiers": [],
+          "vegetarian": true,
+          "spicy": true
         },
-        "no_onion": {
-            "name": "No Onion",
-            "price": 0,
-            "description": "Remove onions"
+        {
+          "id": "vstart_palak_chaat",
+          "name": "Palak Chaat",
+          "description": "Crispy spinach, pomegranate, yogurt, tamarind chutney, mint chutney, chopped tomato and onions",
+          "base_price": 13.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 13.0
+            }
+          ],
+          "modifiers": [],
+          "vegetarian": true
         },
-        "no_garlic": {
-            "name": "No Garlic",
-            "price": 0,
-            "description": "Remove garlic"
+        {
+          "id": "vstart_samosa_chaat",
+          "name": "Samosa Chaat",
+          "description": "Crispy turnovers, seasoned potatoes, green peas",
+          "base_price": 13.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 13.0
+            }
+          ],
+          "modifiers": [],
+          "vegetarian": true
         },
-        "no_yogurt": {
-            "name": "No Yogurt",
-            "price": 0,
-            "description": "Remove yogurt"
+        {
+          "id": "vstart_paneer_tikka",
+          "name": "Paneer Tikka",
+          "description": "Cottage cheese marinated with yogurt, cream, turmeric and Indian spices",
+          "base_price": 15.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 15.0
+            }
+          ],
+          "modifiers": [],
+          "vegetarian": true
         },
-        "no_paneer": {
-            "name": "No Paneer",
-            "price": 0,
-            "description": "Remove cottage cheese"
+        {
+          "id": "vstart_truffle_grilled_mushrooms",
+          "name": "Truffle Grilled Mushrooms",
+          "description": "Signature chargrilled mushrooms with truffle oil",
+          "base_price": 16.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 16.0
+            }
+          ],
+          "modifiers": []
         },
-        "mint_chutney": {
-            "name": "Add Mint Chutney",
-            "price": 0,
-            "description": "Extra mint chutney"
+        {
+          "id": "vstart_dahi_aloo_papri",
+          "name": "Dahi Aloo Papri",
+          "description": "Wheat crisps, potatoes, chickpeas, yogurt, tamarind and mint chutney",
+          "base_price": 13.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 13.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "papri chaat",
+            "dahi papri chaat"
+          ]
         },
-        "tamarind_chutney": {
-            "name": "Add Tamarind Chutney",
-            "price": 0,
-            "description": "Extra tamarind chutney"
+        {
+          "id": "vstart_fig_naan_with_spiced_eggplant",
+          "name": "Fig Naan With Spiced Eggplant",
+          "description": "Fluffy naan served with spiced eggplant mash and figs",
+          "base_price": 16.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 16.0
+            }
+          ],
+          "modifiers": []
         },
-        "extra_sauce": {
-            "name": "Extra Sauce",
-            "price": 0,
-            "description": "Additional gravy"
+        {
+          "id": "vstart_aloo_tikki_with_pindi_cholley",
+          "name": "Aloo Tikki With Pindi Cholley",
+          "description": "Potato patties with smoky chickpeas. May contain nuts",
+          "base_price": 14.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 14.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "aloo tikki",
+            "aloo tikki chole",
+            "aloo tikki with chole",
+            "aloo tikki chaat"
+          ]
         },
-        "less_cream": {
-            "name": "Less Cream",
-            "price": 0,
-            "description": "Reduce cream"
+        {
+          "id": "vstart_honey_chili_lotus",
+          "name": "Honey Chili Lotus",
+          "description": "Lotus root, spring onion, honey, garlic, dry chili paste",
+          "base_price": 14.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 14.0
+            }
+          ],
+          "modifiers": []
         },
-        "extra_cream": {
-            "name": "Extra Cream",
-            "price": 0,
-            "description": "More cream"
+        {
+          "id": "vstart_beetroot_tikki",
+          "name": "Beetroot Tikki",
+          "description": "Goat cheese, beets, potato crisps",
+          "base_price": 15.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 15.0
+            }
+          ],
+          "modifiers": [],
+          "vegetarian": true
         },
-        "butter": {
-            "name": "Add Butter",
-            "price": 0,
-            "description": "Butter topping"
+        {
+          "id": "vstart_pickled_mushrooms",
+          "name": "Pickled Mushrooms",
+          "description": "Chargrilled mushrooms marinated in a robust pickle seasoning",
+          "base_price": 16.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 16.0
+            }
+          ],
+          "modifiers": [],
+          "vegetarian": true,
+          "spicy": true
         },
-        "garlic": {
-            "name": "Add Garlic",
-            "price": 0,
-            "description": "Garlic topping"
+        {
+          "id": "vstart_dahi_ke_kabab",
+          "name": "Dahi Ke Kabab",
+          "description": "Crispy patty of spiced hung curd, paneer and herbs with a creamy center, served with mint chutney",
+          "base_price": 15.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 15.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "dahi kabab"
+          ]
         },
-        "extra_garlic": {
-            "name": "Extra Garlic",
-            "price": 0,
-            "description": "Double garlic"
+        {
+          "id": "vstart_tandoori_broccoli",
+          "name": "Tandoori Broccoli",
+          "description": "Broccoli crowns marinated with yogurt, cream, turmeric and spices",
+          "base_price": 14.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 14.0
+            }
+          ],
+          "modifiers": []
         }
+      ]
+    },
+    {
+      "name": "Non-Vegetarian Starters",
+      "items": [
+        {
+          "id": "nvstart_aslam_butter_chicken_tikka",
+          "name": "Aslam Butter Chicken Tikka",
+          "description": "A signature of Old Delhi: chicken tikka tossed with smoky butter and cream",
+          "base_price": 16.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 16.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "nvstart_chili_garlic_chicken",
+          "name": "Chili Garlic Chicken",
+          "description": "Spicy fried chicken tossed with green onion, ginger and garlic",
+          "base_price": 17.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 17.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "nvstart_kabab_trio",
+          "name": "Kabab Trio",
+          "description": "A tasting trio of hariyali kabab, malai kabab and chicken tikka",
+          "base_price": 15.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 15.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "nvstart_truffle_bhuna_chicken_bao_buns",
+          "name": "Truffle Bhuna Chicken Bao Buns",
+          "description": "Three soft bao buns filled with chicken in bhuna masala with truffle oil, cilantro and tamarind chutney",
+          "base_price": 15.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 15.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "bao buns",
+            "chicken bao buns"
+          ]
+        },
+        {
+          "id": "nvstart_malai_fish_tikka",
+          "name": "Malai Fish Tikka",
+          "description": "Salmon cubes marinated with yogurt, ginger, garlic and spices, cooked in the clay oven",
+          "base_price": 16.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 16.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "nvstart_mango_tulsi_prawns",
+          "name": "Mango Tulsi Prawns",
+          "description": "Tandoori grilled shrimp with fresh basil and mango puree",
+          "base_price": 17.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 17.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "nvstart_achari_fish_tikka",
+          "name": "Achari Fish Tikka",
+          "description": "Salmon cubes marinated in yogurt and spices with a subtle pickle flavor",
+          "base_price": 17.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 17.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "nvstart_masala_calamari",
+          "name": "Masala Calamari",
+          "description": "Fried calamari tossed with onions and peppers in a bold, spicy tomato masala",
+          "base_price": 15.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 15.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "nvstart_saffron_butter_garlic_crab",
+          "name": "Saffron Butter Garlic Crab",
+          "description": "Blue crab simmered in saffron butter and garlic with cracked black pepper",
+          "base_price": 15.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 15.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "nvstart_sukha_goat",
+          "name": "Sukha Goat",
+          "description": "Baby goat slow-cooked dry with aromatic spices, herbs and caramelized onions",
+          "base_price": 26.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 26.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "nvstart_chicken_tandoori_momo",
+          "name": "Chicken Tandoori Momo",
+          "description": "Smoky grilled dumplings stuffed with tandoori-spiced chicken, served with sauces",
+          "base_price": 15.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 15.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "chicken momo",
+            "momos"
+          ]
+        },
+        {
+          "id": "nvstart_afghani_chicken_kabab",
+          "name": "Afghani Chicken Kabab",
+          "description": "Boneless chicken marinated in ginger, garlic and cardamom",
+          "base_price": 16.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 16.0
+            }
+          ],
+          "modifiers": []
+        }
+      ]
+    },
+    {
+      "name": "Vegetable Entrées",
+      "description": "Entrées are served with basmati rice.",
+      "items": [
+        {
+          "id": "vent_palak_paneer",
+          "name": "Palak Paneer",
+          "description": "Creamed spinach with cubes of homemade cottage cheese",
+          "base_price": 24.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 24.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "saag paneer"
+          ],
+          "vegetarian": true
+        },
+        {
+          "id": "vent_paneer_tikka_masala",
+          "name": "Paneer Tikka Masala",
+          "description": "Cottage cheese in mildly spiced tomato onion gravy with peppers, onions and cilantro",
+          "base_price": 24.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 24.0
+            }
+          ],
+          "modifiers": [],
+          "vegetarian": true
+        },
+        {
+          "id": "vent_aloo_gobi_masala_dum",
+          "name": "Aloo Gobi Masala Dum",
+          "description": "Cauliflower and potato sauteed with ginger, turmeric and spices",
+          "base_price": 23.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 23.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "aloo gobi"
+          ],
+          "vegetarian": true,
+          "vegan": true
+        },
+        {
+          "id": "vent_dal_makhani",
+          "name": "Dal Makhani",
+          "description": "Black lentils slow-cooked over a low fire, from the famous Bukhara in Delhi",
+          "base_price": 23.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 23.0
+            }
+          ],
+          "modifiers": [],
+          "vegetarian": true
+        },
+        {
+          "id": "vent_malai_kofte",
+          "name": "Malai Kofte",
+          "description": "Vegetable and cheese dumplings in a rich cashew sauce",
+          "base_price": 24.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 24.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "malai kofta"
+          ],
+          "vegetarian": true
+        },
+        {
+          "id": "vent_dal_jalwa",
+          "name": "Dal Jalwa",
+          "description": "Smooth yellow lentils from the North-West Frontier. Vegan",
+          "base_price": 23.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 23.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "dal yellow",
+            "yellow dal"
+          ],
+          "vegetarian": true,
+          "vegan": true
+        },
+        {
+          "id": "vent_mirchi_baingan_ka_salan",
+          "name": "Mirchi Baingan Ka Salan",
+          "description": "Long hot chilis, baby eggplant, ginger, garlic and mustard seeds in a semi-gravy",
+          "base_price": 23.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 23.0
+            }
+          ],
+          "modifiers": [],
+          "vegetarian": true,
+          "vegan": true,
+          "spicy": true
+        },
+        {
+          "id": "vent_baingan_bharta",
+          "name": "Baingan Bharta",
+          "description": "Charcoal grilled eggplant cooked with onions, tomatoes, ginger and cilantro",
+          "base_price": 23.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 23.0
+            }
+          ],
+          "modifiers": [],
+          "vegetarian": true,
+          "vegan": true
+        },
+        {
+          "id": "vent_pindi_cholley",
+          "name": "Pindi Cholley",
+          "description": "A smokier version of chana masala",
+          "base_price": 23.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 23.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "pindi chole",
+            "pindi chana"
+          ],
+          "vegetarian": true,
+          "vegan": true
+        },
+        {
+          "id": "vent_vegetable_korma",
+          "name": "Vegetable Korma",
+          "description": "Mixed vegetables in a silky cashew korma sauce",
+          "base_price": 23.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 23.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "veg korma",
+            "navratan korma"
+          ],
+          "vegetarian": true
+        },
+        {
+          "id": "vent_bhindi_masala",
+          "name": "Bhindi Masala",
+          "description": "Okra tossed with onions and spices, topped with cilantro",
+          "base_price": 23.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 23.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "okra masala"
+          ],
+          "vegetarian": true,
+          "vegan": true
+        },
+        {
+          "id": "vent_dal_palak",
+          "name": "Dal Palak",
+          "description": "Yellow lentils simmered overnight with fresh spinach",
+          "base_price": 23.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 23.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "vent_dal_frontier",
+          "name": "Dal Frontier",
+          "description": "Black and yellow lentils simmered overnight, tempered with ginger, garlic and cumin",
+          "base_price": 23.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 23.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "vent_veg_kolhapuri",
+          "name": "Veg Kolhapuri",
+          "description": "Mixed vegetables in a thick, spicy Kolhapuri gravy with mustard seeds and curry leaves",
+          "base_price": 23.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 23.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "vegetable kolhapuri"
+          ]
+        },
+        {
+          "id": "vent_kadai_paneer",
+          "name": "Kadai Paneer",
+          "description": "Homemade cottage cheese cooked in a wok with bell pepper and tomatoes",
+          "base_price": 24.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 24.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "paneer kadai"
+          ]
+        },
+        {
+          "id": "vent_paneer_dilruba",
+          "name": "Paneer Dilruba",
+          "description": "Cubed cottage cheese in creamy tomato gravy",
+          "base_price": 24.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 24.0
+            }
+          ],
+          "modifiers": [],
+          "vegetarian": true
+        },
+        {
+          "id": "vent_subzi_ki_tarkari",
+          "name": "Subzi Ki Tarkari",
+          "description": "Green vegetables cooked with onion, tomatoes, peppers, paneer and ground spices",
+          "base_price": 23.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 23.0
+            }
+          ],
+          "modifiers": [],
+          "vegetarian": true,
+          "vegan": true
+        },
+        {
+          "id": "vent_anjeer_kofte",
+          "name": "Anjeer Kofte",
+          "description": "Fig and cheese dumplings in a rich saffron cream sauce",
+          "base_price": 24.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 24.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "anjeer kofta"
+          ]
+        },
+        {
+          "id": "vent_chana_masala",
+          "name": "Chana Masala",
+          "description": "Chickpeas cooked with onions, garlic, ginger and spices",
+          "base_price": 23.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 23.0
+            }
+          ],
+          "modifiers": [],
+          "vegetarian": true,
+          "vegan": true
+        },
+        {
+          "id": "vent_methi_paneer_malai_toast",
+          "name": "Methi Paneer Malai Toast",
+          "description": "Mint cottage cheese triangles baked in a creamy fenugreek and cardamom gravy",
+          "base_price": 24.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 24.0
+            }
+          ],
+          "modifiers": [],
+          "vegetarian": true
+        },
+        {
+          "id": "vent_gobi_taka_tin",
+          "name": "Gobi Taka Tin",
+          "description": "Cauliflower in an Indian wok with peppers, onions and tomatoes",
+          "base_price": 23.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 23.0
+            }
+          ],
+          "modifiers": [],
+          "vegetarian": true,
+          "vegan": true
+        },
+        {
+          "id": "vent_bhindi_jalwa",
+          "name": "Bhindi Jalwa",
+          "description": "Crispy okra tossed with masalas, almost like okra chips",
+          "base_price": 23.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 23.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "crispy okra",
+            "crispy bhindi"
+          ],
+          "vegetarian": true
+        }
+      ]
+    },
+    {
+      "name": "From Our Clay Oven",
+      "items": [
+        {
+          "id": "tandoor_tandoori_shrimp",
+          "name": "Tandoori Shrimp",
+          "description": "Jumbo shrimp marinated with a dash of saffron, cooked in the tandoor",
+          "base_price": 29.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 29.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "tandoor_tandoori_chicken",
+          "name": "Tandoori Chicken",
+          "description": "Half chicken marinated with yogurt and spices, cooked in the tandoor",
+          "base_price": 25.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 25.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "tandoor_mahi_tandoori",
+          "name": "Mahi Tandoori",
+          "description": "Salmon fillets spiced and grilled in the clay oven",
+          "base_price": 29.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 29.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "tandoori salmon",
+            "tandoori fish"
+          ]
+        },
+        {
+          "id": "tandoor_lamb_seekh_kabab",
+          "name": "Lamb Seekh Kabab",
+          "description": "Skewered ground lamb with onion, ginger, garlic, saffron and spices",
+          "base_price": 28.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 28.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "tandoor_murgh_malai_kabab",
+          "name": "Murgh Malai Kabab",
+          "description": "Boneless chicken breast with herbs, spices, ginger and garlic",
+          "base_price": 27.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 27.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "malai kabab",
+            "chicken malai kabab"
+          ]
+        },
+        {
+          "id": "tandoor_jalwa_lamb_chops",
+          "name": "Jalwa Lamb Chops",
+          "description": "Lamb chops marinated in ginger and garlic, served with grilled vegetables",
+          "base_price": 34.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 34.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "lamb chops"
+          ]
+        },
+        {
+          "id": "tandoor_jalwa_tandoori_mix_grill",
+          "name": "Jalwa Tandoori Mix Grill",
+          "description": "Hariyali kabab, malai kabab, chicken tikka, lamb barrah kabab and lamb seekh kabab",
+          "base_price": 34.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 34.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "mixed grill",
+            "tandoori mixed grill"
+          ]
+        },
+        {
+          "id": "tandoor_achari_chicken_tikka",
+          "name": "Achari Chicken Tikka",
+          "description": "Boneless chicken marinated in a pickle seasoning",
+          "base_price": 27.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 27.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "tandoor_barrah_kabab",
+          "name": "Barrah Kabab",
+          "description": "Boneless lamb marinated in yogurt, ginger, garlic and spices",
+          "base_price": 28.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 28.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "tandoor_mal_mal_kabab",
+          "name": "Mal Mal Kabab",
+          "description": "Skewered ground chicken with onion, ginger, garlic, saffron and spices",
+          "base_price": 27.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 27.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "tandoor_grilled_vegetables",
+          "name": "Grilled Vegetables",
+          "description": "Greens, onions, bell peppers, cottage cheese, broccoli and cauliflower, served with pineapple",
+          "base_price": 24.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 24.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "tandoor_sharabi_kabab",
+          "name": "Sharabi Kabab",
+          "description": "Boneless chicken marinated in yogurt and spices, Jalwa's chicken tikka",
+          "base_price": 26.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 26.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "tandoor_hariyali_chicken_tikka",
+          "name": "Hariyali Chicken Tikka",
+          "description": "Boneless chicken marinated in mint and coriander",
+          "base_price": 27.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 27.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "tandoor_pudina_paneer_tikka",
+          "name": "Pudina Paneer Tikka",
+          "description": "Mint-flavored homemade cottage cheese kabab",
+          "base_price": 25.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 25.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "tandoor_mango_habanero_chicken_curry",
+          "name": "Mango Habanero Chicken Curry",
+          "description": "Boneless chicken in a house habanero sauce infused with mango",
+          "base_price": 25.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 25.0
+            }
+          ],
+          "modifiers": []
+        }
+      ]
+    },
+    {
+      "name": "Chicken Entrées",
+      "description": "Entrées are served with basmati rice.",
+      "items": [
+        {
+          "id": "chicken_chicken_tikka_masala",
+          "name": "Chicken Tikka Masala",
+          "description": "The most popular dish. Chicken in mildly spiced tomato sauce with peppers, onions and cilantro",
+          "base_price": 26.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 26.0
+            }
+          ],
+          "modifiers": [
+            "white_meat"
+          ],
+          "aliases": [
+            "tikka masala",
+            "ctm"
+          ],
+          "popular": true
+        },
+        {
+          "id": "chicken_shahi_murgh_korma",
+          "name": "Shahi Murgh Korma",
+          "description": "Chicken in a creamy cashew sauce with cardamom",
+          "base_price": 25.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 25.0
+            }
+          ],
+          "modifiers": [
+            "white_meat"
+          ],
+          "aliases": [
+            "chicken korma"
+          ]
+        },
+        {
+          "id": "chicken_chicken_vindaloo",
+          "name": "Chicken Vindaloo",
+          "description": "Medium. Chili, vinegar and garlic, not for the faint-hearted",
+          "base_price": 25.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 25.0
+            }
+          ],
+          "modifiers": [
+            "white_meat"
+          ]
+        },
+        {
+          "id": "chicken_pandara_road_wala_butter_chicken",
+          "name": "Pandara Road Wala Butter Chicken",
+          "description": "Chicken on the bone in a creamy, spicy tomato gravy, the way it's made in Delhi",
+          "base_price": 30.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 30.0
+            }
+          ],
+          "modifiers": [
+            "white_meat"
+          ]
+        },
+        {
+          "id": "chicken_goan_chicken_curry",
+          "name": "Goan Chicken Curry",
+          "description": "Chicken curry with traditional Goan spices and fresh coconut",
+          "base_price": 27.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 27.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "chicken_chicken_saagwala",
+          "name": "Chicken Saagwala",
+          "description": "Boneless chicken sauteed with spinach and aromatic spices",
+          "base_price": 25.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 25.0
+            }
+          ],
+          "modifiers": [
+            "white_meat"
+          ],
+          "aliases": [
+            "chicken saag"
+          ]
+        },
+        {
+          "id": "chicken_chicken_chettinad",
+          "name": "Chicken Chettinad",
+          "description": "Spicy South Indian curry with Chettinad spices, black pepper and curry leaves",
+          "base_price": 25.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 25.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "chicken_kadai_chicken",
+          "name": "Kadai Chicken",
+          "description": "Chicken in an Indian wok with peppers, onions, herbs and spices",
+          "base_price": 24.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 24.0
+            }
+          ],
+          "modifiers": [
+            "white_meat_3"
+          ],
+          "aliases": [
+            "chicken kadai"
+          ]
+        },
+        {
+          "id": "chicken_chicken_methi",
+          "name": "Chicken Methi",
+          "description": "Chicken curry cooked with fresh fenugreek",
+          "base_price": 25.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 25.0
+            }
+          ],
+          "modifiers": [
+            "white_meat"
+          ]
+        },
+        {
+          "id": "chicken_chicken_makhani",
+          "name": "Chicken Makhani",
+          "description": "Chicken roasted in the clay oven and tossed in a creamy tomato sauce",
+          "base_price": 27.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 27.0
+            }
+          ],
+          "modifiers": [
+            "white_meat"
+          ]
+        },
+        {
+          "id": "chicken_tariwala_kukkad",
+          "name": "Tariwala Kukkad",
+          "description": "Homestyle chicken curry in an onion, tomato and yogurt sauce with ginger, garlic and chilis",
+          "base_price": 25.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 25.0
+            }
+          ],
+          "modifiers": [
+            "white_meat"
+          ],
+          "aliases": [
+            "homestyle chicken curry"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Lamb and Goat Entrées",
+      "description": "Entrées are served with basmati rice.",
+      "items": [
+        {
+          "id": "lamb_lamb_rogan_josh",
+          "name": "Lamb Rogan Josh",
+          "description": "Braised lamb, brown onion, Kashmiri spices",
+          "base_price": 28.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 28.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "lamb_jalwa_lamb_korma",
+          "name": "Jalwa Lamb Korma",
+          "description": "Tender lamb in a silky korma sauce",
+          "base_price": 27.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 27.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "lamb korma"
+          ]
+        },
+        {
+          "id": "lamb_lamb_tikka_masala",
+          "name": "Lamb Tikka Masala",
+          "description": "Lamb in mildly spiced tomato onion gravy with peppers, onions and cilantro",
+          "base_price": 27.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 27.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "lamb_classic_goat_curry",
+          "name": "Classic Goat Curry",
+          "description": "Goat in an onion, tomato and yogurt sauce with ginger, garlic and chilis",
+          "base_price": 28.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 28.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "goat curry"
+          ]
+        },
+        {
+          "id": "lamb_rara_bhuna_goat",
+          "name": "Rara Bhuna Goat",
+          "description": "Goat stir-cooked in a semi-dry brown sauce with caramelized onion",
+          "base_price": 27.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 27.0
+            }
+          ],
+          "modifiers": []
+        }
+      ]
+    },
+    {
+      "name": "From The Sea",
+      "items": [
+        {
+          "id": "sea_goan_shrimp_curry",
+          "name": "Goan Shrimp Curry",
+          "description": "Goan shrimp curry with mustard seeds, tamarind and coconut milk",
+          "base_price": 28.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 28.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "sea_methi_machli",
+          "name": "Methi Machli",
+          "description": "Salmon in a light curry gravy with fresh fenugreek",
+          "base_price": 28.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 28.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "sea_garlic_shrimp_bhuna",
+          "name": "Garlic Shrimp Bhuna",
+          "description": "Shrimp cooked in a wok with garlic, ground spices, peppers and onions",
+          "base_price": 28.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 28.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "sea_goan_fish_curry",
+          "name": "Goan Fish Curry",
+          "description": "Goan fish curry with coconut milk, Indian herbs and spices",
+          "base_price": 28.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 28.0
+            }
+          ],
+          "modifiers": []
+        }
+      ]
+    },
+    {
+      "name": "Rice Selection",
+      "items": [
+        {
+          "id": "rice_dum_pukht_chicken_biryani",
+          "name": "Dum Pukht Chicken Biryani",
+          "description": "Basmati rice cooked with chicken, served with raita",
+          "base_price": 25.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 25.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "chicken biryani"
+          ]
+        },
+        {
+          "id": "rice_dum_pukht_lamb_biryani",
+          "name": "Dum Pukht Lamb Biryani",
+          "description": "Basmati rice cooked with lamb, served with raita",
+          "base_price": 27.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 27.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "lamb biryani"
+          ]
+        },
+        {
+          "id": "rice_dum_pukht_goat_biryani",
+          "name": "Dum Pukht Goat Biryani",
+          "description": "Basmati rice cooked with goat, served with raita",
+          "base_price": 26.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 26.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "goat biryani"
+          ]
+        },
+        {
+          "id": "rice_basmati_rice",
+          "name": "Basmati Rice",
+          "description": "Aromatic long grain rice",
+          "base_price": 5.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 5.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "plain rice",
+            "white rice"
+          ]
+        },
+        {
+          "id": "rice_shrimp_biryani",
+          "name": "Shrimp Biryani",
+          "description": "Basmati rice cooked with shrimp, served with raita",
+          "base_price": 27.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 27.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "rice_vegetable_biryani",
+          "name": "Vegetable Biryani",
+          "description": "Basmati rice cooked with vegetables, herbs and spices, served with raita",
+          "base_price": 23.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 23.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "veg biryani"
+          ]
+        },
+        {
+          "id": "rice_hyderabadi_chicken_dum_biryani",
+          "name": "Hyderabadi Chicken Dum Biryani",
+          "description": "Basmati rice and chicken slow-cooked in a sealed pot",
+          "base_price": 25.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 25.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "hyderabadi biryani"
+          ]
+        },
+        {
+          "id": "rice_saffron_basmati_rice",
+          "name": "Saffron Basmati Rice",
+          "description": "Aromatic long grain rice with saffron",
+          "base_price": 6.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 6.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "saffron rice"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "The Bread Bar",
+      "items": [
+        {
+          "id": "bread_garlic_naan",
+          "name": "Garlic Naan",
+          "description": "White flour bread topped with fresh minced garlic",
+          "base_price": 6.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 6.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "bread_butter_naan",
+          "name": "Butter Naan",
+          "description": "Crispy white flour bread",
+          "base_price": 5.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 5.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "bread_plain_naan",
+          "name": "Plain Naan",
+          "description": "Crispy white flour bread",
+          "base_price": 5.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 5.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "bread_chili_garlic_naan",
+          "name": "Chili Garlic Naan",
+          "description": "White flour bread topped with garlic and Indian green chili",
+          "base_price": 7.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 7.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "bread_goat_cheese_naan",
+          "name": "Goat Cheese Naan",
+          "description": "White flour bread stuffed with fresh goat cheese",
+          "base_price": 7.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 7.0
+            }
+          ],
+          "modifiers": [
+            "truffle_oil"
+          ]
+        },
+        {
+          "id": "bread_jalebi_paratha",
+          "name": "Jalebi Paratha",
+          "description": "Multilayered flour bread",
+          "base_price": 6.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 6.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "bread_pudina_paratha",
+          "name": "Pudina Paratha",
+          "description": "Minted whole wheat bread",
+          "base_price": 6.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 6.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "bread_peshwari_naan",
+          "name": "Peshwari Naan",
+          "description": "Flour bread stuffed with raisins and cherries",
+          "base_price": 7.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 7.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "peshawari naan"
+          ]
+        },
+        {
+          "id": "bread_onion_kulcha",
+          "name": "Onion Kulcha",
+          "description": "White flour bread stuffed with fresh onion",
+          "base_price": 6.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 6.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "bread_lacha_paratha",
+          "name": "Lacha Paratha",
+          "description": "Multilayered whole wheat bread",
+          "base_price": 6.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 6.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "lachha paratha"
+          ]
+        },
+        {
+          "id": "bread_tandoori_roti",
+          "name": "Tandoori Roti",
+          "description": "Unleavened whole wheat bread",
+          "base_price": 5.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 5.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "bread_garlic_rosemary_naan",
+          "name": "Garlic Rosemary Naan",
+          "description": "White flour bread with fresh rosemary and minced garlic",
+          "base_price": 7.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 7.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "bread_aloo_paratha",
+          "name": "Aloo Paratha",
+          "description": "Whole wheat bread stuffed with potatoes, onions and chilies",
+          "base_price": 7.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 7.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "aloo parantha"
+          ]
+        },
+        {
+          "id": "bread_jalwa_paratha",
+          "name": "Jalwa Paratha",
+          "description": "House specialty with minced garlic and onion, topped with fresh mint",
+          "base_price": 7.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 7.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "bread_jalwa_bread_basket",
+          "name": "Jalwa Bread Basket",
+          "description": "Naan, garlic naan, onion kulcha and tandoori roti",
+          "base_price": 15.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 15.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "bread basket"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Desserts",
+      "items": [
+        {
+          "id": "dessert_shakori_rasmalai",
+          "name": "Shakori Rasmalai",
+          "description": "Sweet, spongy cottage cheese dumplings flavored with green cardamom",
+          "base_price": 7.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 7.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "rasmalai",
+            "ras malai"
+          ]
+        },
+        {
+          "id": "dessert_gulab_jamun",
+          "name": "Gulab Jamun",
+          "description": "Light warm milk pastry soaked in honey",
+          "base_price": 7.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 7.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "dessert_malai_kulfi_ice_cream",
+          "name": "Malai Kulfi Ice Cream",
+          "description": null,
+          "base_price": 7.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 7.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "kulfi"
+          ]
+        },
+        {
+          "id": "dessert_moong_dal_halwa",
+          "name": "Moong Dal Halwa",
+          "description": "Lentil pudding with clarified butter, milk, saffron and cardamom",
+          "base_price": 7.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 7.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "dessert_vanilla_ice_cream",
+          "name": "Vanilla Ice Cream",
+          "description": null,
+          "base_price": 7.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 7.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "dessert_mango_ice_cream",
+          "name": "Mango Ice Cream",
+          "description": null,
+          "base_price": 7.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 7.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "dessert_paan_masala_ice_cream",
+          "name": "Paan Masala Ice Cream",
+          "description": "Chef's special mouth-refreshing ice cream with Indian flavors",
+          "base_price": 8.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 8.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "dessert_caramel_custard",
+          "name": "Caramel Custard",
+          "description": "Silky custard topped with golden caramel",
+          "base_price": 7.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 7.0
+            }
+          ],
+          "modifiers": []
+        }
+      ]
+    },
+    {
+      "name": "Side Orders",
+      "items": [
+        {
+          "id": "side_raita",
+          "name": "Raita",
+          "description": "Cool yogurt sauce with cucumber and roasted cumin, garnished with cilantro",
+          "base_price": 5.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 5.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "side_the_original_mango_chutney",
+          "name": "The Original Mango Chutney",
+          "description": null,
+          "base_price": 5.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 5.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "mango chutney"
+          ]
+        },
+        {
+          "id": "side_achar",
+          "name": "Achar",
+          "description": null,
+          "base_price": 3.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 3.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "pickle",
+            "mixed pickle"
+          ]
+        },
+        {
+          "id": "side_papad_and_chutney",
+          "name": "Papad and Chutney",
+          "description": null,
+          "base_price": 4.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 4.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "papad",
+            "papadum"
+          ]
+        },
+        {
+          "id": "side_the_jalwa_mango_chutney",
+          "name": "The Jalwa Mango Chutney",
+          "description": "Sweet and tangy relish of ripe mangoes, vinegar, sugar and spices",
+          "base_price": 7.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 7.0
+            }
+          ],
+          "modifiers": []
+        }
+      ]
+    },
+    {
+      "name": "Beverages",
+      "items": [
+        {
+          "id": "drink_mango_lassi",
+          "name": "Mango Lassi",
+          "description": "Ripe mango and creamy yogurt, lightly sweetened and chilled",
+          "base_price": 5.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 5.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "drink_diet_coke",
+          "name": "Diet Coke",
+          "description": null,
+          "base_price": 3.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 3.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "drink_pellegrino_water",
+          "name": "Pellegrino Water",
+          "description": null,
+          "base_price": 7.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 7.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "sparkling water",
+            "san pellegrino"
+          ]
+        },
+        {
+          "id": "drink_still_water",
+          "name": "Still Water",
+          "description": null,
+          "base_price": 7.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 7.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "water",
+            "bottled water"
+          ]
+        },
+        {
+          "id": "drink_club_soda",
+          "name": "Club Soda",
+          "description": null,
+          "base_price": 3.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 3.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "drink_sprite",
+          "name": "Sprite",
+          "description": null,
+          "base_price": 3.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 3.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "drink_coke",
+          "name": "Coke",
+          "description": null,
+          "base_price": 3.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 3.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "coca cola"
+          ]
+        },
+        {
+          "id": "drink_ginger_ale",
+          "name": "Ginger Ale",
+          "description": null,
+          "base_price": 3.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 3.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "drink_shirley_temple",
+          "name": "Shirley Temple",
+          "description": "Grenadine, bubbles and a cherry on top",
+          "base_price": 10.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 10.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "drink_blue_lagoon",
+          "name": "Blue Lagoon",
+          "description": "Blue curaçao and citrus",
+          "base_price": 10.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 10.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "drink_mango_mojito",
+          "name": "Mango Mojito",
+          "description": "Mango, mint, lime and bubbles",
+          "base_price": 10.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 10.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "drink_jaljeera",
+          "name": "Jaljeera",
+          "description": "Roasted cumin and tangy spices",
+          "base_price": 9.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 9.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "drink_watermelon_mint",
+          "name": "Watermelon Mint",
+          "description": "Fresh watermelon, mint and lime",
+          "base_price": 10.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 10.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "drink_kokum_cooler",
+          "name": "Kokum Cooler",
+          "description": "Sweet and tangy kokum",
+          "base_price": 10.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 10.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "drink_pina_colada",
+          "name": "Pina Colada",
+          "description": "Pineapple and creamy coconut",
+          "base_price": 10.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 10.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "drink_lemonade",
+          "name": "Lemonade",
+          "description": "Lemon, pineapple and blue curaçao syrup",
+          "base_price": 10.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 10.0
+            }
+          ],
+          "modifiers": []
+        }
+      ]
+    },
+    {
+      "name": "South Indian Breakfast",
+      "items": [
+        {
+          "id": "breakfast_build_your_own_dosa",
+          "name": "Build Your Own Dosa",
+          "description": "Choose your style and filling, then add extras. Cilantro and chili included",
+          "base_price": 12.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 12.0
+            }
+          ],
+          "modifiers": [
+            "rava_dosa",
+            "butter",
+            "ghee",
+            "onion",
+            "cheese",
+            "podi",
+            "spring_mix",
+            "nutella",
+            "mysore_masala",
+            "schezwan",
+            "veg_masala",
+            "paneer",
+            "tofu_and_kale",
+            "single_egg",
+            "double_egg",
+            "chicken",
+            "chicken_tikka",
+            "lamb_keema"
+          ],
+          "aliases": [
+            "dosa",
+            "masala dosa",
+            "plain dosa"
+          ]
+        },
+        {
+          "id": "breakfast_idli",
+          "name": "Idli",
+          "description": "Steamed rice and lentil cakes",
+          "base_price": 12.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 12.0
+            }
+          ],
+          "modifiers": [
+            "ghee_podi",
+            "dip_in_sambar"
+          ]
+        },
+        {
+          "id": "breakfast_medu_vada",
+          "name": "Medu Vada",
+          "description": "Three crisp lentil fritters with ginger, cumin and cilantro",
+          "base_price": 12.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 12.0
+            }
+          ],
+          "modifiers": [
+            "dip_in_sambar"
+          ],
+          "aliases": [
+            "vada"
+          ]
+        },
+        {
+          "id": "breakfast_paniyaram",
+          "name": "Paniyaram",
+          "description": "Eight pan-roasted rice and lentil dumplings",
+          "base_price": 13.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 13.0
+            }
+          ],
+          "modifiers": [
+            "chili_cheese",
+            "ghee_podi",
+            "dip_in_sambar"
+          ]
+        },
+        {
+          "id": "breakfast_idli_vada_combo",
+          "name": "Idli Vada Combo",
+          "description": "Two idli and one vada",
+          "base_price": 13.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 13.0
+            }
+          ],
+          "modifiers": [
+            "dip_in_sambar"
+          ]
+        },
+        {
+          "id": "breakfast_jalwa_breakfast_platter",
+          "name": "Jalwa Breakfast Platter",
+          "description": "Plain or veg masala dosa, 1 idli, 1 vada and 3 paniyaram, with masala tea, filter coffee or mango lassi, chutneys and sambar",
+          "base_price": 25.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 25.0
+            }
+          ],
+          "modifiers": []
+        },
+        {
+          "id": "breakfast_masala_tea",
+          "name": "Masala Tea",
+          "description": null,
+          "base_price": 5.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 5.0
+            }
+          ],
+          "modifiers": [],
+          "aliases": [
+            "chai",
+            "masala chai"
+          ]
+        },
+        {
+          "id": "breakfast_filter_coffee",
+          "name": "Filter Coffee",
+          "description": null,
+          "base_price": 5.0,
+          "sizes": [
+            {
+              "name": "regular",
+              "price": 5.0
+            }
+          ],
+          "modifiers": []
+        }
+      ],
+      "available": {
+        "days": [
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+          "sunday"
+        ],
+        "hours": "9:00 AM - 3:00 PM"
+      }
     }
+  ],
+  "modifiers": {
+    "garlic_naan": {
+      "name": "Garlic Naan",
+      "price": 1.0
+    },
+    "onion_kulcha": {
+      "name": "Onion Kulcha",
+      "price": 1.0
+    },
+    "white_meat": {
+      "name": "White Meat",
+      "price": 2.0
+    },
+    "white_meat_3": {
+      "name": "White Meat",
+      "price": 3.0
+    },
+    "truffle_oil": {
+      "name": "Truffle Oil",
+      "price": 1.0
+    },
+    "rava_dosa": {
+      "name": "Rava Dosa",
+      "price": 2.0
+    },
+    "butter": {
+      "name": "Butter",
+      "price": 1.0
+    },
+    "ghee": {
+      "name": "Ghee",
+      "price": 1.0
+    },
+    "onion": {
+      "name": "Onion",
+      "price": 1.0
+    },
+    "cheese": {
+      "name": "Cheese",
+      "price": 2.0
+    },
+    "podi": {
+      "name": "Podi",
+      "price": 1.0
+    },
+    "spring_mix": {
+      "name": "Spring Mix",
+      "price": 1.0
+    },
+    "nutella": {
+      "name": "Nutella",
+      "price": 1.0
+    },
+    "mysore_masala": {
+      "name": "Mysore Masala",
+      "price": 1.0
+    },
+    "schezwan": {
+      "name": "Schezwan",
+      "price": 1.0
+    },
+    "veg_masala": {
+      "name": "Veg Masala",
+      "price": 2.0
+    },
+    "paneer": {
+      "name": "Paneer",
+      "price": 3.0
+    },
+    "tofu_and_kale": {
+      "name": "Tofu and Kale",
+      "price": 4.0
+    },
+    "single_egg": {
+      "name": "Single Egg",
+      "price": 2.0
+    },
+    "double_egg": {
+      "name": "Double Egg",
+      "price": 4.0
+    },
+    "chicken": {
+      "name": "Chicken",
+      "price": 6.0
+    },
+    "chicken_tikka": {
+      "name": "Chicken Tikka",
+      "price": 6.0
+    },
+    "lamb_keema": {
+      "name": "Lamb Keema",
+      "price": 6.0
+    },
+    "ghee_podi": {
+      "name": "Ghee Podi",
+      "price": 1.0
+    },
+    "dip_in_sambar": {
+      "name": "Dip in Sambar",
+      "price": 2.0
+    },
+    "chili_cheese": {
+      "name": "Chili Cheese",
+      "price": 2.0
+    }
+  }
 }

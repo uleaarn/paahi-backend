@@ -15,7 +15,7 @@
  * tests all drive this same class.
  */
 import { LANGUAGES, phrases } from './languages.js';
-import { openStatus } from './menu-service.js';
+import { openStatus, nextOpening } from './menu-service.js';
 import { formatPhone, speakPhone, normalizePhone } from './order-state.js';
 
 const MAX_TOOL_ROUNDS = 5;
@@ -112,11 +112,17 @@ export class ConversationEngine {
         return h.known ? h.open : null;
     }
 
+    nextOpeningText() {
+        const at = nextOpening(this.location.hours, this.clock(), this.business.timezone, 7);
+        if (!at) return '';
+        return ` Next opening: ${new Intl.DateTimeFormat('en-US', { timeZone: this.business.timezone, weekday: 'long', hour: 'numeric', minute: '2-digit' }).format(at)}.`;
+    }
+
     systemPrompt(utterance, detectedLanguage) {
         const h = this.hours();
         const openLine = !h.known
             ? `Open status: unknown (today's hours: ${h.today_hours || 'not configured'}). Do not guess.`
-            : `Currently ${h.open ? 'OPEN' : 'CLOSED'}. Today's hours: ${h.today_hours}.`;
+            : `Currently ${h.open ? 'OPEN' : 'CLOSED'}. Today's hours: ${h.today_hours}.${h.open ? '' : this.nextOpeningText()}`;
         const weekHours = Object.entries(this.location.hours || {}).map(([d, v]) => `${d}: ${v}`).join('; ');
         const enabled = this.business.languages.enabled.map(c => `${LANGUAGES[c].name} (${c})`).join(', ');
 

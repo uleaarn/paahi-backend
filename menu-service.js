@@ -38,9 +38,11 @@ export class MenuService {
         this.matcher.buildSearchIndex();
 
         this.itemsById = new Map();
+        this.categoryByItemId = new Map();
         for (const category of menu.categories) {
             for (const item of category.items || []) {
                 this.itemsById.set(item.id, { ...item, category: category.name });
+                this.categoryByItemId.set(item.id, category);
             }
         }
         this.globalModifiers = menu.modifiers || {};
@@ -48,6 +50,15 @@ export class MenuService {
 
     getItem(id) {
         return this.itemsById.get(id) || null;
+    }
+
+    /** Can this item be ordered for this time? (e.g. lunch specials only Mon-Thu lunch) */
+    availability(item, at, timeZone) {
+        const category = this.categoryByItemId.get(item.id);
+        if (categoryAvailableAt(category, at, timeZone)) return { ok: true };
+        const a = category.available;
+        const days = a.days?.length === 7 ? 'daily' : a.days?.join(', ');
+        return { ok: false, error: 'not_available_at_that_time', item: item.name, available: [days, a.hours].filter(Boolean).join(' ') };
     }
 
     /**
@@ -166,7 +177,9 @@ export class MenuService {
     compactMenuText() {
         const lines = [];
         for (const category of this.menu.categories) {
-            lines.push(`${category.name}:`);
+            const a = category.available;
+            const when = a ? ` (only ${a.days?.length === 7 ? 'daily' : a.days.join(', ')} ${a.hours || ''})`.replace(/\s+\)/, ')') : '';
+            lines.push(`${category.name}${when}:${category.description ? ` ${category.description}` : ''}`);
             for (const item of category.items || []) {
                 const sizes = this.getSizes(item)
                     .map(s => (s.name === 'regular' ? `$${s.price}` : `${s.name} $${s.price}`)).join(' / ');
@@ -234,3 +247,110 @@ export function openStatus(hours, now = new Date(), timeZone = 'America/New_York
 }
 
 export { DAYS };
+
+// ---------------------------------------------------------------------------
+// Scheduled pickup times
+// ---------------------------------------------------------------------------
+
+/** Open ranges for one day's hours text, in minutes: [[660, 900], [1020, 1350]], or null if unparseable. */
+export function dayRanges(dayText) {
+    if (!dayText) return null;
+    if (/closed/i.test(dayText)) return [];
+    const ranges = dayText.split(',').map(r => r.split('-').map(parseClock));
+    if (ranges.some(r => r.length !== 2 || r[0] === null || r[1] === null)) return null;
+    return ranges;
+}
+
+/** Calendar date + weekday + minutes of `date` in the business's time zone. */
+export function zonedParts(date, timeZone) {
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+        timeZone, year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'long', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(date).map(x => [x.type, x.value]));
+    return { date: `${p.year}-${p.month}-${p.day}`, day: p.weekday.toLowerCase(), minutes: Number(p.hour) * 60 + Number(p.minute) };
+}
+
+/** The instant when the business's wall clock shows `dateStr` (YYYY-MM-DD) at `minutes`. */
+export function zonedTime(dateStr, minutes, timeZone) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const wall = Date.UTC(y, m - 1, d, Math.floor(minutes / 60), minutes % 60);
+    let guess = wall;
+    for (let i = 0; i < 2; i++) { // converge on the zone offset (handles DST)
+        const p = zonedParts(new Date(guess), timeZone);
+        const [py, pm, pd] = p.date.split('-').map(Number);
+        const shown = Date.UTC(py, pm - 1, pd, Math.floor(p.minutes / 60), p.minutes % 60);
+        guess += wall - shown;
+    }
+    return new Date(guess);
+}
+
+function addDays(dateStr, n) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
+
+/** Is the business open at this instant per its weekly hours? null when unknown. */
+export function isOpenAt(hours, at, timeZone) {
+    const p = zonedParts(at, timeZone);
+    const ranges = dayRanges(hours?.[p.day]);
+    if (ranges === null) return null;
+    return ranges.some(([start, end]) => p.minutes >= start && p.minutes < end);
+}
+
+/** Next instant the business opens after `now`, within `maxDays`. null if none/unknown. */
+export function nextOpening(hours, now, timeZone, maxDays = 7) {
+    const today = zonedParts(now, timeZone);
+    for (let n = 0; n <= maxDays; n++) {
+        const dateStr = addDays(today.date, n);
+        const day = DAYS[new Date(`${dateStr}T12:00:00Z`).getUTCDay()];
+        const ranges = dayRanges(hours?.[day]);
+        if (ranges === null) return null;
+        for (const [start] of ranges) {
+            if (n === 0 && start <= today.minutes) continue;
+            return zonedTime(dateStr, start, timeZone);
+        }
+    }
+    return null;
+}
+
+/**
+ * Check a requested pickup time ("YYYY-MM-DD" + "HH:MM", business local time).
+ * Rules: in the future by at least minLeadMinutes, within maxDaysAhead, and
+ * inside opening hours that day (not in the last few minutes before closing).
+ */
+export function checkPickupTime(hours, { date, time }, { now, timeZone, minLeadMinutes = 20, maxDaysAhead = 7, closingBufferMinutes = 15 }) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date)) || !/^\d{1,2}:\d{2}$/.test(String(time))) {
+        return { ok: false, error: 'invalid_time_format', message: 'Send date as YYYY-MM-DD and time as 24-hour HH:MM, in the business local time.' };
+    }
+    const [h, mi] = time.split(':').map(Number);
+    if (h > 23 || mi > 59) return { ok: false, error: 'invalid_time_format' };
+    const minutes = h * 60 + mi;
+    const at = zonedTime(date, minutes, timeZone);
+    const today = zonedParts(now, timeZone).date;
+    if (at.getTime() < now.getTime() + minLeadMinutes * 60000) {
+        return { ok: false, error: 'too_soon', message: `Pickup must be at least ${minLeadMinutes} minutes from now.` };
+    }
+    if (date > addDays(today, maxDaysAhead)) {
+        return { ok: false, error: 'too_far_ahead', message: `Orders can be scheduled up to ${maxDaysAhead} days ahead.` };
+    }
+    const day = DAYS[new Date(`${date}T12:00:00Z`).getUTCDay()];
+    const ranges = dayRanges(hours?.[day]);
+    if (ranges === null) return { ok: false, error: 'hours_unknown' };
+    const inside = ranges.some(([start, end]) => minutes >= start && minutes <= end - closingBufferMinutes);
+    if (!inside) {
+        return { ok: false, error: 'outside_opening_hours', day, hours: hours[day], message: `Not open then. ${day} hours: ${hours[day]}.` };
+    }
+    return { ok: true, at };
+}
+
+/** Is a menu category available at this instant? (e.g. lunch specials Mon-Thu 11:30-3) */
+export function categoryAvailableAt(category, at, timeZone) {
+    const a = category?.available;
+    if (!a) return true;
+    const p = zonedParts(at, timeZone);
+    if (a.days && !a.days.includes(p.day)) return false;
+    if (a.hours) {
+        const ranges = dayRanges(a.hours);
+        if (ranges && !ranges.some(([s, e]) => p.minutes >= s && p.minutes < e)) return false;
+    }
+    return true;
+}

@@ -8,7 +8,6 @@
         "start": "node server.js",
         "dev": "node --watch server.js",
         "test": "node test-audio.js",
-        "test:menu": "node test-menu-matcher.js",
         "test:email": "node test-email.js",
         "test:analytics": "node test-analytics.js",
         "test:order": "node --test test-order-flow.js",
