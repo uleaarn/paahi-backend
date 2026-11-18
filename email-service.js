@@ -61,7 +61,8 @@ class EmailService {
             items,
             order_summary,
             timestamp,
-            session_id
+            session_id,
+            business_name = RESTAURANT_NAME
         } = orderData;
 
         const formattedTime = new Date(timestamp).toLocaleString('en-US', {
@@ -156,7 +157,7 @@ class EmailService {
 <body>
     <div class="header">
         <h1>🎉 New Phone Order Received!</h1>
-        <p style="margin: 10px 0 0 0; font-size: 16px;">${RESTAURANT_NAME}</p>
+        <p style="margin: 10px 0 0 0; font-size: 16px;">${business_name}</p>
     </div>
     
     <div class="content">
@@ -214,7 +215,7 @@ class EmailService {
     </div>
 
     <div class="footer">
-        <p>This is an automated notification from ${RESTAURANT_NAME} Voice Agent</p>
+        <p>This is an automated notification from Paahi for ${business_name}</p>
         <p>${[RESTAURANT_LOCATION, RESTAURANT_PHONE].filter(Boolean).join(' | ')}</p>
     </div>
 </body>
@@ -227,32 +228,36 @@ class EmailService {
      * @param {Object} orderData - Order information
      * @returns {Promise<Object>} Result of email send
      */
-    async sendOrderConfirmation(orderData) {
+    /**
+     * @param {object} orderData
+     * @param {{ to?: string, businessName?: string }} [options] per-business recipient and name
+     */
+    async sendOrderConfirmation(orderData, { to = EMAIL_TO, businessName = orderData.business_name || RESTAURANT_NAME } = {}) {
         if (!this.configured) {
             console.warn('⚠️ Email service not configured, skipping email notification');
             return { success: false, error: 'Email service not configured' };
         }
 
         try {
-            const htmlContent = this.formatOrderEmail(orderData);
-            const subject = `New Order: ${orderData.customer_name || 'Customer'} - ${new Date(orderData.timestamp).toLocaleTimeString('en-US', { timeZone: 'America/New_York' })}`;
+            const htmlContent = this.formatOrderEmail({ ...orderData, business_name: businessName });
+            const subject = `${orderData.type === 'callback_request' ? 'CALL BACK' : 'New Order'}: ${orderData.customer_name || 'Customer'} - ${new Date(orderData.timestamp).toLocaleTimeString('en-US', { timeZone: 'America/New_York' })}`;
 
             const mailOptions = {
-                from: `"${RESTAURANT_NAME} Voice Agent" <${EMAIL_USER}>`,
-                to: EMAIL_TO,
+                from: `"${businessName} via Paahi" <${EMAIL_USER}>`,
+                to,
                 subject: subject,
                 html: htmlContent,
                 text: `New order from ${orderData.customer_name || 'Customer'}\nPhone: ${orderData.customer_phone}\nItems: ${orderData.items}\n\nOrder Summary: ${orderData.order_summary}`
             };
 
-            console.log(`📧 Sending order confirmation email to ${EMAIL_TO}...`);
+            console.log(`📧 Sending ${orderData.type === 'callback_request' ? 'callback request' : 'order'} email for ${businessName}...`);
             const info = await this.transporter.sendMail(mailOptions);
 
             console.log(`✅ Email sent successfully: ${info.messageId}`);
             return {
                 success: true,
                 messageId: info.messageId,
-                recipient: EMAIL_TO
+                recipient: to
             };
 
         } catch (error) {

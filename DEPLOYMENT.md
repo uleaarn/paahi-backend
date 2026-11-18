@@ -9,19 +9,24 @@ This project is ready for Railway, Render, Fly.io, or any Node.js host that supp
 - `LLM_MODEL`
 - `DEEPGRAM_API_KEY`
 - `GOOGLE_APPLICATION_CREDENTIALS_JSON`
+- `DATABASE_URL`: Supabase Postgres as the `paahi_app` role (see `docs/DATABASE.md`). Optionally `DATABASE_CA_CERT`.
 
-## Recommended Restaurant Variables
+## Routing and Business Settings
 
-- `RESTAURANT_NAME`
-- `RESTAURANT_LOCATION`
-- `RESTAURANT_PHONE`
-- `INITIAL_GREETING`
+- Business settings (name, hours, menu, languages, numbers) live in `businesses/<id>/business.json`. See `docs/BUSINESSES.md`.
+- `DEFAULT_BUSINESS_ID`: send calls to numbers not listed in any business.json to this business (single-business deployments).
 
-## Optional Integrations
+## Notifications
 
-- `N8N_WEBHOOK_URL` for completed order submission
-- `EMAIL_USER`, `EMAIL_PASS`, `EMAIL_TO` for restaurant email alerts
-- `ANALYTICS_LOG_DIR`, `ANALYTICS_RETENTION_DAYS` for local call logs
+- `EMAIL_USER`, `EMAIL_PASS`: the sending account (Gmail app password).
+- One recipient variable per business, named in its business.json (`email_to_env`). For Jalwa that is `EMAIL_TO`.
+- Optional webhook per business (`webhook_url_env`). For Jalwa that is `N8N_WEBHOOK_URL`. Not needed for calls or orders.
+
+## Other
+
+- `ADMIN_API_TOKEN` protects `/analytics/*`. Unset means those endpoints are off.
+- `DEEPGRAM_MODEL` (default `nova-3`), `LLM_TIMEOUT_MS`.
+- `ANALYTICS_LOG_DIR`, `ANALYTICS_RETENTION_DAYS` for local call and order logs. On Railway, attach a volume, or these logs are lost on redeploy.
 
 ## Railway
 

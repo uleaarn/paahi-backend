@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
  * Menu Matcher - Fuzzy matching and phonetic search for menu items
  * Handles typos, pronunciation variations, and common misspellings
  */
-class MenuMatcher {
+export class MenuMatcher {
     constructor(menuPath = null) {
         this.menu = null;
         this.menuItems = [];
@@ -324,8 +324,9 @@ class MenuMatcher {
     }
 }
 
-// Export singleton instance
-const menuPath = path.join(__dirname, 'data', 'menu.json');
+// Singleton for the legacy test script (test-menu-matcher.js), loaded with the pilot
+// business's menu. Live calls build their own MenuMatcher per business (menu-service.js).
+const menuPath = path.join(__dirname, 'businesses', 'jalwa-montclair', 'menu.json');
 const menuMatcher = new MenuMatcher(menuPath);
 
 export default menuMatcher;

@@ -48,6 +48,10 @@ class CallAnalytics {
             // Prepare call record
             const callRecord = {
                 callId: callData.callId,
+                businessId: callData.businessId || null,
+                locationId: callData.locationId || null,
+                language: callData.language || null,
+                languageHistory: callData.languageHistory || [],
                 startTime: callData.startTime,
                 endTime: callData.endTime,
                 duration: callData.duration,
@@ -57,6 +61,7 @@ class CallAnalytics {
                 transcript: callData.transcript || [],
                 orderData: callData.orderData || null,
                 failureReason: callData.failureReason || null,
+                events: callData.events || [],
                 metadata: {
                     transcriptLength: callData.transcript?.length || 0,
                     itemsOrdered: callData.orderData?.items?.length || 0,
