@@ -18,7 +18,8 @@ This project is ready for Railway, Render, Fly.io, or any Node.js host that supp
 
 ## Notifications
 
-- `EMAIL_USER`, `EMAIL_PASS`: the sending account (Gmail app password).
+- `RESEND_API_KEY` (recommended): staff emails go through Resend's HTTPS API. Railway's Hobby plan blocks outgoing SMTP, so Gmail sending times out there. Optional `RESEND_FROM` (an address on a domain verified in Resend); without one, mail comes from `onboarding@resend.dev` and Resend only delivers to the account owner's address, so `EMAIL_TO` must be that address until a domain is verified.
+- `EMAIL_USER`, `EMAIL_PASS`: Gmail sending account (app password). Used only when `RESEND_API_KEY` isn't set, on hosts that allow SMTP.
 - One recipient variable per business, named in its business.json (`email_to_env`). For Jalwa that is `EMAIL_TO`.
 - Optional webhook per business (`webhook_url_env`). Jalwa doesn't use one.
 

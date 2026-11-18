@@ -11,6 +11,7 @@ import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { MenuService, openStatus, checkPickupTime, nextOpening } from './menu-service.js';
+import { EmailService } from './email-service.js';
 import { OrderState, PHASES, isExplicitConfirmation, normalizePhone } from './order-state.js';
 import { BusinessRegistry } from './business-registry.js';
 import { createConversation, actionsFactory } from './call-factory.js';
@@ -869,4 +870,33 @@ test('prompt: pickup-only business never asks pickup or delivery; short replies;
     assert.doesNotMatch(prompt, /ask whether it's for pickup/);
     assert.match(prompt, /about 25 words at most/);
     assert.match(prompt, /If the business details below say CLOSED, say so in one sentence/);
+});
+
+// ------------------------------------------------------------- staff email
+
+test('email: Resend is used when its key is set, with a retry-safe idempotency key', async () => {
+    const calls = [];
+    const fetchImpl = async (url, init) => { calls.push({ url, init }); return { ok: true, status: 200, json: async () => ({ id: 'em_123' }) }; };
+    const svc = new EmailService({ env: { RESEND_API_KEY: 're_test' }, fetchImpl });
+    assert.equal(svc.provider, 'resend');
+    const r = await svc.sendOrderConfirmation(
+        { type: 'order', customer_name: 'Babu', customer_phone: '(973) 555-1234', items: '1 Naan', order_summary: 'PICKUP order', timestamp: new Date().toISOString(), pickup_time: 'Tuesday, Nov 17, 5:00 PM' },
+        { to: 'kitchen@jalwa.test', businessName: 'Jalwa', idempotencyKey: 'paahi-notification:n1' });
+    assert.equal(r.success, true);
+    assert.equal(r.messageId, 'em_123');
+    assert.equal(calls[0].url, 'https://api.resend.com/emails');
+    assert.equal(calls[0].init.headers.Authorization, 'Bearer re_test');
+    assert.equal(calls[0].init.headers['Idempotency-Key'], 'paahi-notification:n1');
+    const body = JSON.parse(calls[0].init.body);
+    assert.deepEqual(body.to, ['kitchen@jalwa.test']);
+    assert.equal(body.from, '"Jalwa via Paahi" <onboarding@resend.dev>');
+    assert.match(body.subject, /^New Order: Babu - .*\(SCHEDULED Tuesday, Nov 17, 5:00 PM\)$/);
+});
+
+test('email: a Resend error is reported as a failure (so the outbox retries)', async () => {
+    const fetchImpl = async () => ({ ok: false, status: 403, json: async () => ({ name: 'validation_error', message: 'You can only send testing emails to your own email address' }) });
+    const svc = new EmailService({ env: { RESEND_API_KEY: 're_test' }, fetchImpl });
+    const r = await svc.sendOrderConfirmation({ type: 'order', timestamp: new Date().toISOString() }, { to: 'x@y.z' });
+    assert.equal(r.success, false);
+    assert.match(r.error, /Resend HTTP 403: You can only send testing emails/);
 });

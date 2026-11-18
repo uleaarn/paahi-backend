@@ -265,7 +265,9 @@ export class Notifier {
     async send(business, row, message) {
         if (row.channel === 'email') {
             if (!this.emailService?.configured || !business.notifications.emailTo) return { success: false, error: 'email_not_configured' };
-            return this.emailService.sendOrderConfirmation(message, { to: business.notifications.emailTo, businessName: business.shortName });
+            return this.emailService.sendOrderConfirmation(message, {
+                to: business.notifications.emailTo, businessName: business.shortName, idempotencyKey: `paahi-notification:${row.id}`,
+            });
         }
         if (row.channel === 'webhook') {
             if (!business.notifications.webhookUrl) return { success: false, error: 'webhook_not_configured' };
