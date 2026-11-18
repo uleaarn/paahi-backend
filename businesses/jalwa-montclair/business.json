@@ -1,0 +1,54 @@
+{
+    "id": "jalwa-montclair",
+    "name": "Jalwa: Modern Indian Dining",
+    "short_name": "Jalwa",
+    "business_type": "restaurant",
+    "timezone": "America/New_York",
+    "agent_name": "Paahi",
+    "locations": [
+        {
+            "id": "montclair",
+            "name": "Jalwa Montclair",
+            "address": "215 Glenridge Ave, Montclair, NJ 07042",
+            "phone": "(973) 250-6364",
+            "hours": {
+                "monday": "11:00 AM - 3:00 PM, 5:00 PM - 10:30 PM",
+                "tuesday": "11:00 AM - 3:00 PM, 5:00 PM - 10:30 PM",
+                "wednesday": "11:00 AM - 3:00 PM, 5:00 PM - 10:30 PM",
+                "thursday": "11:00 AM - 3:00 PM, 5:00 PM - 10:30 PM",
+                "friday": "11:00 AM - 3:00 PM, 5:00 PM - 11:00 PM",
+                "saturday": "11:00 AM - 3:00 PM, 5:00 PM - 11:00 PM",
+                "sunday": "11:00 AM - 3:00 PM, 5:00 PM - 9:30 PM"
+            }
+        }
+    ],
+    "phone_numbers": [],
+    "languages": {
+        "default": "en",
+        "enabled": [
+            "en"
+        ],
+        "allow_experimental": false,
+        "greetings": {},
+        "voices": {}
+    },
+    "faqs": [],
+    "workflows": {
+        "restaurant_ordering": {
+            "enabled": true,
+            "menu_file": "menu.json",
+            "order_types": [
+                "pickup"
+            ],
+            "delivery": null
+        }
+    },
+    "escalation": {
+        "callback_enabled": true,
+        "transfer_phone_env": null
+    },
+    "notifications": {
+        "email_to_env": "EMAIL_TO",
+        "webhook_url_env": "N8N_WEBHOOK_URL"
+    }
+}

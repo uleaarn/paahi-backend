@@ -10,7 +10,9 @@
         "test": "node test-audio.js",
         "test:menu": "node test-menu-matcher.js",
         "test:email": "node test-email.js",
-        "test:analytics": "node test-analytics.js"
+        "test:analytics": "node test-analytics.js",
+        "test:order": "node --test test-order-flow.js",
+        "simulate": "node simulate-call.js"
     },
     "keywords": [
         "twilio",
@@ -34,9 +36,13 @@
         "nodemailer": "^6.9.0",
         "openai": "^6.17.0",
         "pcm-convert": "^1.6.5",
+        "pg": "8.16.3",
         "ws": "^8.19.0"
     },
     "engines": {
         "node": ">=18.0.0"
+    },
+    "devDependencies": {
+        "@electric-sql/pglite": "0.5.16"
     }
 }

@@ -178,11 +178,10 @@ function testMenuLoading() {
     console.log('\n🧪 Testing menu data loading...');
 
     try {
-        const menuPath = path.join(__dirname, 'data', 'menu.json');
+        const menuPath = path.join(__dirname, 'businesses', 'jalwa-montclair', 'menu.json');
         const menu = JSON.parse(fs.readFileSync(menuPath, 'utf-8'));
 
         console.log(`  ✓ Menu loaded successfully`);
-        console.log(`  ✓ Restaurant: ${menu.restaurant_name}`);
         console.log(`  ✓ Categories: ${menu.categories.length}`);
 
         let totalItems = 0;

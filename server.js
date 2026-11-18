@@ -12,6 +12,11 @@ import { fileURLToPath } from 'url';
 import mulaw from 'alawmulaw';
 import analytics from './analytics.js';
 import emailService from './email-service.js';
+import { BusinessRegistry } from './business-registry.js';
+import { createConversation, actionsFactory } from './call-factory.js';
+import { Database, pgAdapter } from './database.js';
+import { Notifier, syncBusiness, notificationChannels } from './business-actions.js';
+import { LANGUAGES } from './languages.js';
 // Polyfill WebSocket for Deepgram SDK
 globalThis.WebSocket = WebSocket;
 
@@ -34,38 +39,47 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const LLM_BASE_URL = process.env.LLM_BASE_URL || 'https://api.deepseek.com';
 const LLM_MODEL = process.env.LLM_MODEL || 'deepseek-chat';
 const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY;
-const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
-const GOOGLE_TTS_VOICE = process.env.GOOGLE_TTS_VOICE || 'en-US-Neural2-D';
-const GOOGLE_TTS_LANGUAGE = process.env.GOOGLE_TTS_LANGUAGE || 'en-US';
+// nova-3 is required for Telugu and for multi-language calls; it is the default.
+const DEEPGRAM_MODEL = process.env.DEEPGRAM_MODEL || 'nova-3';
+const LLM_TIMEOUT_MS = Number(process.env.LLM_TIMEOUT_MS) || 10000;
+// Used only when the dialed number isn't listed in any business.json (single-business deployments).
+const DEFAULT_BUSINESS_ID = process.env.DEFAULT_BUSINESS_ID || null;
+// Protects /analytics/* (call records contain customer details). Unset = endpoints disabled.
+const ADMIN_API_TOKEN = process.env.ADMIN_API_TOKEN || null;
+// Supabase Postgres, connected as the paahi_app role (see docs/DATABASE.md).
+const DATABASE_URL = process.env.DATABASE_URL;
+const DATABASE_CA_CERT = process.env.DATABASE_CA_CERT || null;
+// Testing switch. Leave false in production.
+const ALLOW_ORDERS_WHEN_CLOSED = process.env.ALLOW_ORDERS_WHEN_CLOSED === 'true';
 
-if (!OPENAI_API_KEY || !DEEPGRAM_API_KEY) {
-    console.error('❌ Missing required API keys');
-    console.error('Required: OPENAI_API_KEY, DEEPGRAM_API_KEY');
-    console.error('Optional: N8N_WEBHOOK_URL (for order submission)');
+if (!OPENAI_API_KEY || !DEEPGRAM_API_KEY || !DATABASE_URL) {
+    console.error('❌ Missing required configuration');
+    console.error('Required: OPENAI_API_KEY, DEEPGRAM_API_KEY, DATABASE_URL');
     process.exit(1);
 }
 
-// Load menu and system instructions
-let menu, systemInstructions;
+// Orders, callback requests and call records live in Postgres; each transaction is scoped to one business.
+const db = new Database(pgAdapter({ connectionString: DATABASE_URL, caCert: DATABASE_CA_CERT }));
+const notifier = new Notifier({ db, emailService });
 
+// Load every business (config, menus, languages, notification settings). Fail fast on bad config.
+let registry;
 try {
-    const menuPath = path.join(__dirname, 'data', 'menu.json');
-    const instructionsPath = path.join(__dirname, 'prompts', 'system-instructions.md');
-
-    menu = JSON.parse(fs.readFileSync(menuPath, 'utf-8'));
-    systemInstructions = fs.readFileSync(instructionsPath, 'utf-8');
-    console.log('✅ Menu and Instructions loaded successfully');
+    registry = new BusinessRegistry({
+        rootDir: path.join(__dirname, 'businesses'),
+        defaultBusinessId: DEFAULT_BUSINESS_ID,
+        createSubmitter: actionsFactory({ db, notifier, emailService }),
+    });
 } catch (error) {
-    console.error('❌ Failed to load required files:', error);
+    console.error(`❌ ${error.message}`);
     process.exit(1);
 }
-
-const RESTAURANT_NAME = process.env.RESTAURANT_NAME || menu.restaurant_name || 'the restaurant';
-const RESTAURANT_LOCATION = process.env.RESTAURANT_LOCATION || menu.location || '';
-const RESTAURANT_PHONE = process.env.RESTAURANT_PHONE || menu.phone || '';
-const AGENT_NAME = process.env.AGENT_NAME || `${RESTAURANT_NAME} AI`;
-const INITIAL_GREETING = process.env.INITIAL_GREETING ||
-    `Hello! Thank you for calling ${RESTAURANT_NAME}. How can I help you today?`;
+for (const w of registry.warnings) console.warn(`⚠️ ${w}`);
+for (const b of registry.list()) {
+    const { submitter } = registry.get(b.id);
+    console.log(`🏢 ${b.id}: languages ${b.languages.enabled.join(', ')}; workflows ${Object.keys(b.workflows).join(', ')}; destinations ${JSON.stringify(submitter.describeDestinations())}`);
+}
+if (!DEFAULT_BUSINESS_ID) console.log('ℹ️ DEFAULT_BUSINESS_ID not set: calls to numbers not listed in a business.json will be declined.');
 
 // Initialize AI clients
 const openai = new OpenAI({
@@ -73,6 +87,35 @@ const openai = new OpenAI({
     baseURL: LLM_BASE_URL
 });
 const deepgram = createClient(DEEPGRAM_API_KEY);
+const ttsClient = new textToSpeech.TextToSpeechClient();
+if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    console.warn('⚠️ No Google Cloud credentials (GOOGLE_APPLICATION_CREDENTIALS_JSON): the agent cannot speak until they are set.');
+}
+
+// One failing provider call must never take down every live call. Some SDKs
+// (google-gax) reject internal promises nobody awaits; log them and keep serving.
+process.on('unhandledRejection', (reason) => {
+    console.error('❌ Unhandled rejection (server kept running):', reason?.message || reason);
+});
+
+/** Speech-to-text settings for a business: one language, or nova-3 multi-language with hints. */
+function sttOptionsFor(business) {
+    const enabled = business.languages.enabled;
+    const model = business.voice.stt_model || DEEPGRAM_MODEL;
+    if (enabled.length > 1) {
+        // Deepgram: code-switching needs nova-3 language=multi; docs recommend endpointing=100.
+        return { model: 'nova-3', language: 'multi', language_hint: enabled, endpointing: 100 };
+    }
+    const code = enabled[0];
+    return { model, language: code === 'en' ? 'en-US' : LANGUAGES[code].stt, endpointing: 300 };
+}
+
+/** Text-to-speech voice for a business in a language (business override, else the registry default). */
+function ttsVoiceFor(business, language) {
+    const override = business.languages.voices[language];
+    const base = LANGUAGES[language].tts;
+    return { languageCode: override?.language_code || base.languageCode, name: override?.voice || base.voice };
+}
 
 // Deepgram WebSocket diagnostic probe
 async function probeDeepgramWebSocket() {
@@ -235,127 +278,123 @@ class AudioConverter {
     }
 }
 
-// n8n Order Submission
-async function submitOrderToN8n(orderData) {
-    if (!N8N_WEBHOOK_URL) {
-        console.log('⚠️ N8N_WEBHOOK_URL not configured, skipping order submission');
-        return { success: false, error: 'No webhook URL configured' };
-    }
-
-    try {
-        console.log('📤 Submitting order to n8n:', JSON.stringify(orderData, null, 2));
-
-        const response = await fetch(N8N_WEBHOOK_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(orderData)
-        });
-
-        if (response.ok) {
-            const result = await response.json();
-            console.log('✅ Order submitted to n8n successfully:', result);
-            return { success: true, data: result };
-        } else {
-            const errorText = await response.text();
-            console.error(`❌ n8n webhook error: ${response.status} ${response.statusText}`);
-            console.error(`Response: ${errorText}`);
-            return { success: false, error: `${response.status}: ${errorText}` };
-        }
-    } catch (error) {
-        console.error('❌ Failed to submit order to n8n:', error.message);
-        return { success: false, error: error.message };
-    }
-}
-
 // Session management
 const sessions = new Map();
 
+// Ignore obvious noise: empty, a single letter, or one repeated character.
+function isNoise(text) {
+    const t = text.trim();
+    return t.length < 2 || /^[a-z]$/i.test(t) || /^(.)\1+$/i.test(t);
+}
+
 class VoiceSession {
-    constructor(streamSid, connection) {
+    constructor(streamSid, connection, { route, callSid = null, callerPhone = null } = {}) {
         this.streamSid = streamSid;
+        this.callSid = callSid;
         this.connection = connection;
-        this.conversationHistory = [];
-        this.audioBuffer = [];
-        this.isProcessing = false;
         this.deepgramConnection = null;
-        this.lastTranscript = '';
-        this.silenceTimer = null;
+        this.closed = false;
+
+        // Speech-to-text: Deepgram sends a sentence in "final" pieces. We join
+        // the pieces and only act once the caller has finished speaking.
+        this.pendingSegments = [];
+        this.pendingLanguages = {};
+        this.utteranceQueue = [];
+        this.isProcessing = false;
 
         // Outbound audio queue
         this.outboundQueue = [];
         this.isPlaying = false;
         this.playTimer = null;
         this.currentStreamAbort = false;
-
-        // STT gating to prevent self-transcription
-        this.isSpeaking = false;  // True when TTS is playing
-        this.cooldownUntil = 0;   // Timestamp to ignore transcripts until
-        this.ttsStartTime = 0;    // When TTS started (to filter short greetings)
-        this.lastUserSpeechTime = 0;  // Track when user last spoke (for barge-in)
-        this.bargeInDetected = false;  // Flag for user interruption
-
-        // Order tracking
-        this.orderData = {
-            items: [],
-            customer_name: null,
-            customer_phone: null,
-            total: 0,
-            status: 'in_progress'
-        };
-        this.orderSubmitted = false;
+        this.isSpeaking = false;
+        this.ttsStartTime = 0;
+        this.hangupAfterPlayback = false;
+        this.hangupTimer = null;
 
         // Frame contract validation (Twilio outbound diagnostics)
         this.frameSizes = [];
         this.sendIntervals = [];
         this.lastFrameSendTime = 0;
 
-        // Analytics tracking
+        // Analytics
         this.callStartTime = new Date().toISOString();
-        this.callEndTime = null;
+        this.firstAudioAt = null;
+        this.lastUtteranceAt = null;
 
-        console.log(`🎙️ New session: ${streamSid}`);
+        // This call only ever sees the one business it was routed to.
+        this.business = route.business;
+        this.actions = route.submitter;
+        this.locationId = route.location.id;
+        this.routedBy = route.routedBy;
+        this.engine = createConversation({
+            route,
+            callId: callSid || streamSid,
+            callerPhone,
+            llm: openai,
+            model: LLM_MODEL,
+            allowOrdersWhenClosed: ALLOW_ORDERS_WHEN_CLOSED,
+            llmTimeoutMs: LLM_TIMEOUT_MS,
+        });
+        this.engine.event('call_received', {
+            call_sid: callSid,
+            business_id: this.business.id,
+            location_id: route.location.id,
+            routed_by: route.routedBy,
+            has_caller_id: Boolean(callerPhone),
+        });
+
+        console.log(`🎙️ New session: ${streamSid} (call ${callSid || 'unknown'}, business ${this.business.id})`);
         this.initializeDeepgram();
     }
 
     initializeDeepgram() {
         try {
+            const stt = sttOptionsFor(this.business);
+            this.engine.event('stt_config', { model: stt.model, language: stt.language });
             this.deepgramConnection = deepgram.listen.live({
-                model: 'nova-2',
-                language: 'en-US',
+                ...stt,
                 smart_format: true,
                 encoding: 'mulaw',
                 sample_rate: 8000,
                 channels: 1,
                 interim_results: true,  // Required for utterance_end_ms
-                endpointing: 300,
-                utterance_end_ms: 1000
+                utterance_end_ms: 1000,
+                vad_events: true,
             });
 
             this.deepgramConnection.on('open', () => {
                 console.log(`🎧 Deepgram connected for ${this.streamSid}`);
             });
 
-            this.deepgramConnection.on('Results', async (data) => {
-                const alt = data.channel?.alternatives?.[0];
-                const transcript = alt?.transcript;
+            this.deepgramConnection.on('Results', (data) => {
+                const transcript = data.channel?.alternatives?.[0]?.transcript?.trim();
 
-                // ✅ Only process FINAL results
-                const isFinal = data.is_final === true || data.speech_final === true;
-                if (!isFinal) return;
-
-                if (transcript && transcript.trim()) {
-                    console.log(`📝 FINAL: "${transcript}"`);
-                    this.lastTranscript = transcript;
-
-                    // Process the transcript with OpenAI
-                    await this.processTranscript(transcript);
+                // Barge-in: caller starts talking over us -> stop our audio now,
+                // using interim results so we don't wait for the sentence to end.
+                if (transcript && this.isSpeaking && !isNoise(transcript) &&
+                    transcript.split(/\s+/).length >= 2 && Date.now() - this.ttsStartTime > 600) {
+                    this.stopPlaybackForBargeIn();
                 }
+
+                if (!data.is_final) return;
+                if (transcript) {
+                    this.pendingSegments.push(transcript);
+                    // With language=multi, Deepgram tags each word's language; count them.
+                    for (const w of data.channel?.alternatives?.[0]?.words || []) {
+                        const lang = String(w.language || '').split('-')[0];
+                        if (lang) this.pendingLanguages[lang] = (this.pendingLanguages[lang] || 0) + 1;
+                    }
+                }
+                if (data.speech_final) this.flushUtterance('speech_final');
             });
+
+            // Fallback when endpointing misses the end of speech (noisy lines).
+            this.deepgramConnection.on('UtteranceEnd', () => this.flushUtterance('utterance_end'));
 
             this.deepgramConnection.on('error', (error) => {
                 console.error(`❌ Deepgram error:`, error);
+                this.engine.event('stt_error', { error: String(error?.message || error) });
             });
 
             this.deepgramConnection.on('close', () => {
@@ -367,365 +406,124 @@ class VoiceSession {
         }
     }
 
-    async processTranscript(transcript) {
-        const now = Date.now();
-
-        // ENHANCED VALIDATION: Filter out obvious misrecognitions and noise
-        const cleanTranscript = transcript.trim();
-
-        // Filter out very short or nonsensical transcripts
-        if (cleanTranscript.length < 2) {
-            console.log(`🚫 FILTERED: Too short - "${transcript}"`);
+    flushUtterance(trigger) {
+        if (this.pendingSegments.length === 0) return;
+        const text = this.pendingSegments.join(' ').replace(/\s+/g, ' ').trim();
+        const langCounts = this.pendingLanguages;
+        this.pendingSegments = [];
+        this.pendingLanguages = {};
+        // Dominant language of this utterance (only when Deepgram reported one).
+        const detectedLanguage = Object.entries(langCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+        if (isNoise(text)) {
+            console.log(`🚫 FILTERED noise: "${text}"`);
             return;
         }
+        console.log(`📝 CALLER (${trigger}): "${text}"`);
+        this.lastUtteranceAt = Date.now();
+        this.engine.event('stt_final', { trigger, chars: text.length, detected_language: detectedLanguage });
+        this.utteranceQueue.push({ text, detectedLanguage });
+        this.drainQueue();
+    }
 
-        // Filter out single letters or repeated characters (likely noise)
-        if (/^[a-z]$/i.test(cleanTranscript) || /^(.)\1+$/i.test(cleanTranscript)) {
-            console.log(`🚫 FILTERED: Single letter/repeated chars - "${transcript}"`);
-            return;
-        }
-
-        // BARGE-IN DETECTION: Allow user to interrupt during TTS
-        if (this.isSpeaking) {
-            // Check if this looks like intentional user speech (not echo)
-            const timeSinceTTSStart = now - this.ttsStartTime;
-            const isLikelyUserSpeech = cleanTranscript.length > 5 && timeSinceTTSStart > 1000;
-
-            if (isLikelyUserSpeech) {
-                console.log(`🎤 BARGE-IN DETECTED: User interrupting TTS - "${transcript}"`);
-                this.bargeInDetected = true;
-                this.stopPlaybackForBargeIn();
-                // Continue processing the transcript
-            } else {
-                console.log(`🚫 STT GATED (TTS playing): isSpeaking=true, transcript="${transcript}"`);
-                return;
-            }
-        }
-
-        // COOLDOWN GATE: Block transcripts during post-TTS cooldown (unless barge-in)
-        if (!this.bargeInDetected && now < this.cooldownUntil) {
-            console.log(`🚫 STT GATED (cooldown): ${this.cooldownUntil - now}ms remaining, transcript="${transcript}"`);
-            return;
-        }
-
-        // Reset barge-in flag
-        this.bargeInDetected = false;
-
-        // ECHO DETECTION: Filter short greetings that arrive within 2s of TTS start
-        const timeSinceTTS = now - this.ttsStartTime;
-        const isShortGreeting = /^(hello|hi|hey|yes|no)[\?]?$/i.test(cleanTranscript);
-        if (isShortGreeting && timeSinceTTS < 2000) {
-            console.log(`🚫 FILTERED ECHO: "${transcript}" (${timeSinceTTS}ms since TTS start)`);
-            return;
-        }
-
-        // DUPLICATE DETECTION: Ignore if same as last transcript within 3 seconds
-        const timeSinceLastSpeech = now - this.lastUserSpeechTime;
-        if (cleanTranscript === this.lastTranscript && timeSinceLastSpeech < 3000) {
-            console.log(`🚫 FILTERED DUPLICATE: "${transcript}" (${timeSinceLastSpeech}ms since last)`);
-            return;
-        }
-
-        console.log(`✅ STT ACCEPTED: "${transcript}" (isSpeaking=${this.isSpeaking}, cooldownUntil=${this.cooldownUntil}, now=${now})`);
-        this.lastUserSpeechTime = now;
-        this.lastTranscript = cleanTranscript;
-
-        if (this.isProcessing) {
-            console.log('⏳ Already processing, queuing...');
-            return;
-        }
-
+    /**
+     * Process utterances one at a time. Nothing the caller says is dropped:
+     * if they speak while we're thinking, it's merged into the next turn.
+     */
+    async drainQueue() {
+        if (this.isProcessing || this.closed) return;
         this.isProcessing = true;
-
         try {
-            // Add user message to history
-            this.conversationHistory.push({
-                role: 'user',
-                parts: [{ text: transcript }]
-            });
+            while (this.utteranceQueue.length > 0 && !this.closed) {
+                const batch = this.utteranceQueue.splice(0);
+                const text = batch.map(u => u.text).join(' ');
+                const detectedLanguage = batch[batch.length - 1].detectedLanguage;
+                const started = Date.now();
+                const reply = await this.engine.handleUtterance(text, { detectedLanguage });
+                this.engine.event('turn_complete', { ms_to_reply_text: Date.now() - started });
+                console.log(`🤖 AGENT: "${reply.say}"`);
 
-            // Get response from the configured chat model
-            const response = await this.getOpenAIResponse();
-
-            if (response) {
-                console.log(`🤖 LLM: "${response}"`);
-
-                // Add assistant response to history
-                this.conversationHistory.push({
-                    role: 'model',
-                    parts: [{ text: response }]
-                });
-
-                // Check if order is complete and submit to n8n
-                await this.checkAndSubmitOrder(response);
-
-                // Convert response to speech and send to caller
-                await this.synthesizeAndSend(response);
+                await this.synthesizeAndSend(reply.say);
+                if (reply.endCall) this.hangupWhenDone();
             }
-
         } catch (error) {
-            console.error(`❌ Error processing transcript:`, error);
+            console.error('❌ Error handling utterance:', error);
         } finally {
             this.isProcessing = false;
         }
     }
 
-    async getOpenAIResponse() {
+    hangupWhenDone() {
+        this.hangupAfterPlayback = true;
+        if (!this.isPlaying) this.finishPlaybackForHangup();
+        // Safety net in case Twilio never acknowledges the final audio.
+        this.hangupTimer = setTimeout(() => this.hangup('timeout'), 20000);
+    }
+
+    finishPlaybackForHangup() {
+        // Ask Twilio to tell us when the caller has actually heard the last audio.
+        this.sendToTwilio({ event: 'mark', streamSid: this.streamSid, mark: { name: 'goodbye' } });
+    }
+
+    onMark(name) {
+        if (name === 'goodbye' && this.hangupAfterPlayback) this.hangup('goodbye_played');
+    }
+
+    hangup(reason) {
+        if (this.closed) return;
+        console.log(`📴 Ending call (${reason})`);
+        this.engine.event('call_ended_by_agent', { reason });
+        // Closing the media stream ends <Connect>; with no further TwiML the call hangs up.
+        try { this.connection.close(); } catch { /* already closed */ }
+    }
+
+    sendToTwilio(payload) {
         try {
-            const currentTime = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
-            const restaurantContext = [
-                `Agent Name: ${AGENT_NAME}`,
-                `Restaurant Name: ${RESTAURANT_NAME}`,
-                RESTAURANT_LOCATION ? `Restaurant Location: ${RESTAURANT_LOCATION}` : null,
-                RESTAURANT_PHONE ? `Restaurant Phone: ${RESTAURANT_PHONE}` : null,
-                '',
-                'Use the following Menu Data as the source of truth for restaurant details, hours, items, modifiers, and prices:',
-                JSON.stringify(menu)
-            ].filter(Boolean).join('\n');
-
-            const fullInstructions = `Current Server Time: ${currentTime}\n\n${restaurantContext}\n\n${systemInstructions}`;
-
-            // Convert internal conversation history to OpenAI-compatible messages
-            const messages = [
-                { role: "system", content: fullInstructions },
-                ...this.conversationHistory.map(msg => ({
-                    role: msg.role === 'user' ? 'user' : 'assistant',
-                    content: msg.parts[0].text
-                }))
-            ];
-
-            const completion = await openai.chat.completions.create({
-                model: LLM_MODEL,
-                messages: messages,
-                temperature: 0.9,
-                max_tokens: 200,
-            });
-
-            return completion.choices[0].message.content;
-
+            if (this.connection.readyState === 1) this.connection.send(JSON.stringify(payload));
         } catch (error) {
-            console.error(`❌ OpenAI error:`, error);
-            return "I apologize, I'm having trouble processing that. Could you please repeat?";
+            console.error('❌ Twilio send error:', error.message);
         }
     }
-
-    async checkAndSubmitOrder(aiResponse) {
-        // Don't submit if already submitted
-        if (this.orderSubmitted) return;
-
-        const lowerResponse = aiResponse.toLowerCase();
-        const conversationText = this.conversationHistory
-            .map(msg => msg.parts[0].text)
-            .join(' ')
-            .toLowerCase();
-
-        // IMPROVED DETECTION: Check if AI is asking for customer details (name/phone)
-        // This indicates the order is being finalized
-        const isAskingForName = lowerResponse.includes('name') &&
-            (lowerResponse.includes('may i have') || lowerResponse.includes('can i get') ||
-                lowerResponse.includes('what is') || lowerResponse.includes('could you provide'));
-
-        const isAskingForPhone = lowerResponse.includes('phone') &&
-            (lowerResponse.includes('number') || lowerResponse.includes('contact'));
-
-        // Also check if customer has already provided name AND phone in conversation
-        const hasName = /(?:name|called?|i'm|i am)\s+(?:is\s+)?([a-z]{2,})/i.test(conversationText);
-        // Fixed regex: matches (425) 683-1803, 425-683-1803, 425.683.1803, 4256831803
-        const hasPhone = /(\(\d{3}\)\s?\d{3}[-.\s]?\d{4}|\d{3}[-.\s]?\d{3}[-.\s]?\d{4}|\d{10})/.test(conversationText);
-
-        // Check if there are order items in the conversation
-        const hasOrderItems = conversationText.includes('samosa') ||
-            conversationText.includes('tikka') ||
-            conversationText.includes('naan') ||
-            conversationText.includes('curry') ||
-            conversationText.includes('biryani');
-
-        // ONLY submit when customer has provided BOTH name AND phone AND there are order items
-        const shouldSubmit = hasName && hasPhone && hasOrderItems;
-
-        // DEBUG: Always log detection status
-        console.log('🔍 Order detection check:');
-        console.log(`   - Conversation text: "${conversationText.substring(0, 200)}..."`);
-        console.log(`   - Has name: ${hasName}`);
-        console.log(`   - Has phone: ${hasPhone}`);
-        console.log(`   - Has order items: ${hasOrderItems}`);
-        console.log(`   - Should submit: ${shouldSubmit}`);
-
-        if (shouldSubmit) {
-            console.log('🎯 Order completion detected!');
-            console.log(`   - Has name: ${hasName}`);
-            console.log(`   - Has phone: ${hasPhone}`);
-            console.log(`   - Has order items: ${hasOrderItems}`);
-            console.log(`   - AI asking for name: ${isAskingForName}`);
-            console.log(`   - AI asking for phone: ${isAskingForPhone}`);
-
-            // Extract customer info from conversation
-            // For name: Look for the customer's response AFTER the AI asks for their name
-            let customerName = 'Unknown';
-            const history = this.conversationHistory;
-            for (let i = 0; i < history.length - 1; i++) {
-                const msg = history[i];
-                const nextMsg = history[i + 1];
-
-                // Check if AI asked for name (multiple patterns)
-                const aiText = msg.parts[0].text.toLowerCase();
-                const isAskingForName = msg.role === 'model' && (
-                    aiText.includes('may i have your name') ||
-                    aiText.includes('your name') ||
-                    aiText.includes('name for the order') ||
-                    aiText.includes('can i get your name')
-                );
-
-                if (isAskingForName) {
-                    // Next message should be the customer's name
-                    if (nextMsg.role === 'user') {
-                        // Extract the name from the user's response
-                        let userResponse = nextMsg.parts[0].text.trim();
-
-                        // Remove common filler words first
-                        userResponse = userResponse.replace(/^(my name is|i'm|i am|it's|its|this is)\s+/i, '');
-
-                        // Check if there's a pattern like "B a b u, Babu" (spelling followed by actual name)
-                        const spellingWithName = userResponse.match(/^([a-z]\s+){2,}[a-z],\s*([a-z]+)/i);
-                        if (spellingWithName) {
-                            // Use the actual name after the comma
-                            customerName = spellingWithName[2];
-                        } else {
-                            // Check if it's ONLY letter-by-letter spelling (e.g., "B o b" or "n a y a n")
-                            const onlySpelling = userResponse.match(/^([a-z]\s+)+[a-z]$/i);
-                            if (onlySpelling) {
-                                // Join the letters together to form the name
-                                customerName = userResponse.replace(/\s+/g, '');
-                            } else {
-                                // Regular name, just clean it up
-                                customerName = userResponse
-                                    .replace(/[.,!?]$/g, '')
-                                    .trim();
-                            }
-                        }
-                        break;
-                    }
-                }
-            }
-
-            // Extract phone with support for (425) 683-1803, 425-683-1803, etc.
-            const phoneMatch = conversationText.match(/(\(\d{3}\)\s?\d{3}[-.\s]?\d{4}|\d{3}[-.\s]?\d{3}[-.\s]?\d{4}|\d{10})/);
-
-            // Extract order items from conversation
-            const orderItems = [];
-            const itemMatches = conversationText.matchAll(/(one|two|three|four|five|\d+)\s+([a-z\s]+(?:samosa|tikka|masala|naan|curry|biryani|rice))/gi);
-            for (const match of itemMatches) {
-                orderItems.push(match[0]);
-            }
-
-            // Build order data
-            const orderData = {
-                customer_name: customerName,
-                // Keep phone formatting with parentheses/dashes for readability
-                customer_phone: phoneMatch ? phoneMatch[1] : 'Unknown',
-                items: orderItems.length > 0 ? orderItems.join(', ') : 'Order in progress',
-                order_summary: `Items: ${orderItems.join(', ') || 'N/A'}. Latest response: ${aiResponse}`,
-                timestamp: new Date().toISOString(),
-                source: 'voice_call',
-                session_id: this.streamSid,
-                conversation_history: this.conversationHistory
-            };
-
-            console.log('📦 Order data prepared:', JSON.stringify(orderData, null, 2));
-
-            // Submit to n8n
-            const result = await submitOrderToN8n(orderData);
-
-            if (result.success) {
-                this.orderSubmitted = true;
-                console.log('✅ Order successfully submitted and saved to database');
-
-                // Send email notification to restaurant
-                console.log('📧 Sending email notification to restaurant...');
-                const emailResult = await emailService.sendOrderConfirmation(orderData);
-                if (emailResult.success) {
-                    console.log(`✅ Email sent to ${emailResult.recipient}`);
-                } else {
-                    console.error('❌ Email notification failed:', emailResult.error);
-                }
-            } else {
-                console.error('❌ Order submission failed:', result.error);
-            }
-        }
-    }
-
 
     async synthesizeAndSend(text) {
         try {
-            this.ttsStartTime = Date.now(); // Track when TTS starts for greeting filter
-            console.log(`🔊 Synthesizing: "${text.substring(0, 50)}..."`);
+            this.ttsStartTime = Date.now();
+            console.log(`🔊 Synthesizing: "${text.substring(0, 60)}..."`);
 
-            // 🎯 Google Cloud TTS - Returns clean LINEAR16 PCM @ 8kHz
-            const ttsClient = new textToSpeech.TextToSpeechClient();
-
-            const request = {
+            // Google Cloud TTS returns LINEAR16 PCM @ 8kHz (shared client, created once).
+            // The voice follows the call language.
+            const voice = ttsVoiceFor(this.business, this.engine.language);
+            const [response] = await ttsClient.synthesizeSpeech({
                 input: { text },
-                voice: {
-                    languageCode: GOOGLE_TTS_LANGUAGE,
-                    name: GOOGLE_TTS_VOICE,
-                },
-                audioConfig: {
-                    audioEncoding: 'LINEAR16',
-                    sampleRateHertz: 8000,
-                    speakingRate: 1.0,
-                    pitch: 0.0,
-                },
-            };
+                voice,
+                // pitch is omitted: Chirp3-HD voices don't accept it.
+                audioConfig: { audioEncoding: 'LINEAR16', sampleRateHertz: 8000, speakingRate: 1.0 },
+            });
 
-            const [response] = await ttsClient.synthesizeSpeech(request);
-
-            // Get clean PCM16 buffer (no ID3 tags, no MP3 encoding!)
             const pcm16Buffer = Buffer.isBuffer(response.audioContent)
                 ? response.audioContent
                 : Buffer.from(response.audioContent, 'base64');
 
-            console.log(`✅ Google TTS: Clean LINEAR16 PCM @ 8kHz`);
-            console.log(`   - Size: ${pcm16Buffer.length} bytes`);
-            console.log(`   - No ID3 tags, no MP3 encoding`);
-            console.log(`   - Ready for μ-law conversion`);
+            // LINEAR16 from Google includes a WAV header; skip it so it isn't played as a click.
+            let pcm = pcm16Buffer;
+            if (pcm16Buffer.subarray(0, 4).toString('ascii') === 'RIFF') {
+                const dataAt = pcm16Buffer.indexOf('data', 12, 'ascii');
+                if (dataAt > 0) pcm = pcm16Buffer.subarray(dataAt + 8);
+            }
+            const mulawBuffer = AudioConverter.pcm16ToMulaw(pcm);
+            console.log(`✅ TTS ready: ${(pcm.length / 16).toFixed(0)}ms of audio in ${Date.now() - this.ttsStartTime}ms`);
 
-            // AUDIO DIAGNOSTICS
-            const sampleRate = 8000;
-            const channels = 1;
-            const bitDepth = 16;
-            const bytesPerSample = bitDepth / 8;
-            const totalSamples = pcm16Buffer.length / bytesPerSample;
-            const durationMs = (totalSamples / sampleRate) * 1000;
-
-            console.log(`📦 PCM16 Audio Received:`);
-            console.log(`   - Size: ${pcm16Buffer.length} bytes`);
-            console.log(`   - Sample Rate: ${sampleRate} Hz`);
-            console.log(`   - Channels: ${channels} (mono)`);
-            console.log(`   - Bit Depth: ${bitDepth}-bit`);
-            console.log(`   - Samples: ${totalSamples}`);
-            console.log(`   - Duration: ${durationMs.toFixed(0)}ms`);
-
-            // Convert PCM16 to μ-law using proven alawmulaw library
-            const mulawBuffer = AudioConverter.pcm16ToMulaw(pcm16Buffer);
-
-            // μ-LAW CONVERSION DIAGNOSTICS
-            const expectedMulawSize = Math.floor(pcm16Buffer.length / 2);
-            const frameSizeBytes = 160; // Twilio expects 160 bytes per 20ms frame
-            const totalFrames = Math.ceil(mulawBuffer.length / frameSizeBytes);
-
-            console.log(`🔄 μ-law Conversion (alawmulaw library):`);
-            console.log(`   - Converted Size: ${mulawBuffer.length} bytes`);
-            console.log(`   - Expected Size: ${expectedMulawSize} bytes`);
-            console.log(`   - Match: ${mulawBuffer.length === expectedMulawSize ? '✅' : '❌'}`);
-            console.log(`   - Frame Size: ${frameSizeBytes} bytes (20ms @ 8kHz)`);
-            console.log(`   - Total Frames: ${totalFrames}`);
-            console.log(`   - Last Frame Size: ${mulawBuffer.length % frameSizeBytes || frameSizeBytes} bytes`);
-
-            // Enqueue the μ-law audio
+            if (!this.firstAudioAt) {
+                this.firstAudioAt = Date.now();
+                this.engine.event('first_audio');
+            }
+            if (this.lastUtteranceAt) {
+                this.engine.event('reply_audio_ready', { ms_since_caller_stopped: Date.now() - this.lastUtteranceAt });
+            }
             this.enqueueMulaw(mulawBuffer);
 
         } catch (error) {
             console.error(`❌ TTS error:`, error);
+            this.engine.event('tts_error', { error: error.message });
         }
     }
 
@@ -754,17 +552,11 @@ class VoiceSession {
         const FRAME_INTERVAL_MS = 20;
         this.isPlaying = true;
         this.currentStreamAbort = false;
-
-        // HARD GATE: Block STT during TTS playback
         this.isSpeaking = true;
-        console.log(`🔊 TTS PLAYBACK STARTED - STT GATED (isSpeaking=true)`);
 
-        // Reset frame contract diagnostics
         this.frameSizes = [];
         this.sendIntervals = [];
         this.lastFrameSendTime = Date.now();
-
-        console.log(`⏱️ Player started. Queue frames: ${this.outboundQueue.length}`);
 
         this.playTimer = setInterval(() => {
             if (this.currentStreamAbort) {
@@ -777,119 +569,122 @@ class VoiceSession {
                 clearInterval(this.playTimer);
                 this.playTimer = null;
                 this.isPlaying = false;
+                this.isSpeaking = false;
 
-                // FRAME CONTRACT DIAGNOSTICS
                 if (this.frameSizes.length > 0) {
-                    const avgFrameSize = this.frameSizes.reduce((a, b) => a + b, 0) / this.frameSizes.length;
-                    const minFrameSize = Math.min(...this.frameSizes);
-                    const maxFrameSize = Math.max(...this.frameSizes);
                     const avgInterval = this.sendIntervals.length > 0
                         ? this.sendIntervals.reduce((a, b) => a + b, 0) / this.sendIntervals.length
                         : 0;
-                    const framesPerSecond = avgInterval > 0 ? 1000 / avgInterval : 0;
-
-                    console.log(`📊 FRAME CONTRACT VALIDATION:`);
-                    console.log(`   - Bytes/Frame: ${avgFrameSize.toFixed(1)} (expected: 160)`);
-                    console.log(`   - Min Frame Size: ${minFrameSize} bytes`);
-                    console.log(`   - Max Frame Size: ${maxFrameSize} bytes`);
-                    console.log(`   - Avg Send Interval: ${avgInterval.toFixed(1)}ms (expected: 20ms)`);
-                    console.log(`   - Frames/Second: ${framesPerSecond.toFixed(1)} (expected: 50)`);
-                    console.log(`   - Total Frames Sent: ${this.frameSizes.length}`);
-                    console.log(`   - Frame Size Variance: ${minFrameSize === maxFrameSize ? '✅ None' : '❌ Varies'}`);
+                    const sizesOk = this.frameSizes.every(s => s === 160);
+                    console.log(`📊 Sent ${this.frameSizes.length} frames, avg interval ${avgInterval.toFixed(1)}ms (expected 20), frame sizes ${sizesOk ? 'OK' : 'VARY'}`);
                 }
-
-                // HARD GATE: Unblock STT with 500ms cooldown after TTS ends (increased from 250ms)
-                this.isSpeaking = false;
-                this.cooldownUntil = Date.now() + 500;
-                console.log(`🔇 TTS PLAYBACK ENDED - STT COOLDOWN 500ms (isSpeaking=false, cooldownUntil=${this.cooldownUntil})`);
-                console.log("✅ Player stopped (queue empty).");
+                if (this.hangupAfterPlayback) this.finishPlaybackForHangup();
                 return;
             }
 
             const frame = this.outboundQueue.shift();
 
-            // Track frame contract metrics
             const now = Date.now();
             this.frameSizes.push(frame.length);
-            if (this.lastFrameSendTime > 0) {
-                this.sendIntervals.push(now - this.lastFrameSendTime);
-            }
+            if (this.lastFrameSendTime > 0) this.sendIntervals.push(now - this.lastFrameSendTime);
             this.lastFrameSendTime = now;
 
-            // STRICT payload
-            this.connection.send(JSON.stringify({
+            this.sendToTwilio({
                 event: "media",
                 streamSid: this.streamSid,
                 media: { payload: frame.toString("base64") }
-            }));
+            });
         }, FRAME_INTERVAL_MS);
     }
 
     stopPlaybackForBargeIn() {
-        // Call this when user starts speaking (barge-in)
-        if (this.isPlaying) {
-            console.log('🛑 Stopping TTS playback for user barge-in');
-            this.currentStreamAbort = true;
-            this.isSpeaking = false;  // Immediately ungate STT
-            this.cooldownUntil = 0;   // Clear cooldown
-        }
+        // Never cut off the goodbye; the call is ending anyway.
+        if (!this.isPlaying || this.hangupAfterPlayback) return;
+        console.log('🛑 Caller interrupted: stopping playback');
+        this.currentStreamAbort = true;
+        this.isSpeaking = false;
+        // Also drop audio Twilio has already buffered.
+        this.sendToTwilio({ event: 'clear', streamSid: this.streamSid });
+        this.engine.event('barge_in');
     }
 
     processAudio(audioPayload) {
         try {
             const mulawBuffer = Buffer.from(audioPayload, 'base64');
-
-            // Send μ-law directly to Deepgram (it's configured for mulaw encoding)
             if (this.deepgramConnection && this.deepgramConnection.getReadyState() === 1) {
                 this.deepgramConnection.send(mulawBuffer);
             }
-
         } catch (error) {
             console.error(`❌ Audio processing error:`, error);
         }
     }
 
     async close() {
+        if (this.closed) return;
+        this.closed = true;
         console.log(`🛑 Closing session: ${this.streamSid}`);
 
-        // Log call to analytics
-        this.callEndTime = new Date().toISOString();
-        const callDuration = (new Date(this.callEndTime) - new Date(this.callStartTime)) / 1000; // seconds
+        if (this.playTimer) clearInterval(this.playTimer);
+        if (this.hangupTimer) clearTimeout(this.hangupTimer);
+
+        for (const w of this.engine.workflows) w.onEnd?.();
+        const state = this.engine.callState();
+        const order = state.workflows.restaurant_ordering || null;
+        const submitted = order?.status === 'submitted';
+        const callEndTime = new Date().toISOString();
+        this.engine.event('call_closed', { final_status: order?.status || null, handoff: Boolean(state.handoff) });
 
         analytics.logCall({
-            callId: this.streamSid,
+            callId: state.call_id,
+            businessId: state.business_id,
+            locationId: state.location_id,
+            language: state.language,
+            languageHistory: state.language_history,
             startTime: this.callStartTime,
-            endTime: this.callEndTime,
-            duration: callDuration,
-            transcript: this.conversationHistory,
-            orderCompleted: this.orderSubmitted,
-            orderData: this.orderSubmitted ? this.orderData : null,
-            customerName: this.orderData.customer_name,
-            customerPhone: this.orderData.customer_phone,
-            failureReason: !this.orderSubmitted ? 'Order not completed' : null
+            endTime: callEndTime,
+            duration: (new Date(callEndTime) - new Date(this.callStartTime)) / 1000,
+            transcript: this.engine.messages
+                .filter(m => (m.role === 'user' || m.role === 'assistant') && m.content)
+                .map(m => ({ role: m.role, text: m.content })),
+            orderCompleted: submitted,
+            orderData: order,
+            customerName: order?.customer?.name || null,
+            customerPhone: order?.customer?.phone || null,
+            failureReason: submitted ? null : (state.handoff?.reason || (order?.items?.length ? 'abandoned_with_items' : 'no_order')),
+            events: this.engine.events,
+        });
+
+        // Durable call record in the database (stages, language, outcome; no transcript).
+        await this.actions.logCall({
+            callSid: state.call_id,
+            locationId: this.locationId,
+            routedBy: this.routedBy,
+            startedAt: this.callStartTime,
+            endedAt: callEndTime,
+            language: state.language,
+            languageHistory: state.language_history,
+            outcome: submitted ? 'order_placed' : (state.handoff ? 'handoff' : (order?.items?.length ? 'abandoned_with_items' : 'no_order')),
+            handoffReason: state.handoff?.reason || null,
+            events: this.engine.events,
         });
 
         if (this.deepgramConnection) {
-            this.deepgramConnection.finish();
+            try { this.deepgramConnection.finish(); } catch { /* ignore */ }
         }
-
-        if (this.silenceTimer) {
-            clearTimeout(this.silenceTimer);
-        }
-
         sessions.delete(this.streamSid);
     }
 }
 
 // Routes
 fastify.get('/', async (request, reply) => {
-    return { status: 'ok', message: `${RESTAURANT_NAME} Voice Agent`, model: LLM_MODEL };
+    return { status: 'ok', service: 'Paahi voice agent', businesses: registry.list().length };
 });
 
 fastify.get('/health', async (request, reply) => {
     const results = await Promise.all([
         checkDeepgramHealth(),
-        checkOpenAIHealth()
+        checkOpenAIHealth(),
+        db.ping().then(() => ({ status: 'ok', service: 'Database' }), e => ({ status: 'error', service: 'Database', error: e.message })),
     ]);
 
     const allOk = results.every(r => r.status === 'ok');
@@ -901,7 +696,15 @@ fastify.get('/health', async (request, reply) => {
     };
 });
 
-// Analytics endpoints
+// Analytics endpoints: call records include customer names and numbers, so they
+// require ADMIN_API_TOKEN, and can be filtered to one business with ?business_id=.
+fastify.addHook('onRequest', async (request, reply) => {
+    if (!request.url.startsWith('/analytics')) return;
+    const token = (request.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    if (!ADMIN_API_TOKEN) return reply.code(404).send({ error: 'not_found' });
+    if (token !== ADMIN_API_TOKEN) return reply.code(401).send({ error: 'unauthorized' });
+});
+
 fastify.get('/analytics/summary', async (request, reply) => {
     const stats = analytics.getStats();
     return {
@@ -912,7 +715,10 @@ fastify.get('/analytics/summary', async (request, reply) => {
 
 fastify.get('/analytics/calls', async (request, reply) => {
     const limit = parseInt(request.query.limit) || 10;
-    const calls = analytics.getRecentCalls(limit);
+    const businessId = request.query.business_id || null;
+    const calls = businessId
+        ? analytics.getRecentCalls(1000).filter(c => c.businessId === businessId).slice(0, limit)
+        : analytics.getRecentCalls(limit);
     return {
         status: 'ok',
         count: calls.length,
@@ -928,14 +734,38 @@ fastify.get('/analytics/metrics', async (request, reply) => {
     };
 });
 
+function xmlEscape(value) {
+    return String(value).replace(/[<>&'"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]));
+}
+
 fastify.post('/twiml', async (request, reply) => {
     const wsUrl = `wss://${request.headers.host}/media-stream`;
-    console.log(`📞 Incoming call - WebSocket URL: ${wsUrl}`);
+    const from = request.body?.From || '';
+    const to = request.body?.To || '';
 
+    // Route by the number that was dialed: one number -> one business.
+    const route = registry.resolve(to);
+    if (!route) {
+        console.warn(`📞 Call to unconfigured number ${to}; declining`);
+        reply.type('text/xml').send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say>Sorry, this number is not set up yet. Goodbye.</Say>
+    <Hangup/>
+</Response>`);
+        return;
+    }
+    console.log(`📞 Incoming call for ${route.business.id} (${route.routedBy}) - WebSocket URL: ${wsUrl}`);
+
+    // Pass business and caller ID to the media stream.
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Connect>
-        <Stream url="${wsUrl}" track="inbound_track" />
+        <Stream url="${xmlEscape(wsUrl)}" track="inbound_track">
+            <Parameter name="business_id" value="${xmlEscape(route.business.id)}" />
+            <Parameter name="location_id" value="${xmlEscape(route.location.id)}" />
+            <Parameter name="routed_by" value="${xmlEscape(route.routedBy)}" />
+            <Parameter name="from" value="${xmlEscape(from)}" />
+        </Stream>
     </Connect>
 </Response>`;
 
@@ -955,13 +785,27 @@ fastify.register(async (fastify) => {
                 switch (msg.event) {
                     case 'start':
                         const streamSid = msg.start.streamSid;
-                        session = new VoiceSession(streamSid, connection);
+                        const params = msg.start.customParameters || {};
+                        const entry = registry.get(params.business_id);
+                        if (!entry) {
+                            console.warn(`❌ Media stream for unknown business "${params.business_id}"; closing`);
+                            connection.close();
+                            return;
+                        }
+                        const location = entry.business.locations.find(l => l.id === params.location_id) || entry.business.locations[0];
+                        session = new VoiceSession(streamSid, connection, {
+                            route: { business: entry.business, submitter: entry.submitter, location, routedBy: params.routed_by || null },
+                            callSid: msg.start.callSid,
+                            callerPhone: params.from || null,
+                        });
                         sessions.set(streamSid, session);
 
-                        // Send initial greeting
-                        setTimeout(async () => {
-                            await session.synthesizeAndSend(INITIAL_GREETING);
-                        }, 1000);
+                        // Greet right away; the stream is ready once 'start' arrives.
+                        await session.synthesizeAndSend(session.engine.greeting());
+                        break;
+
+                    case 'mark':
+                        if (session) session.onMark(msg.mark?.name);
                         break;
 
                     case 'media':
@@ -997,11 +841,24 @@ fastify.register(async (fastify) => {
 // Start server
 (async () => {
     try {
+        // Database must be reachable, migrated, and unable to bypass row-level security.
+        const { role } = await db.checkTenantSafety();
+        console.log(`🗄️ Database connected as ${role} (row-level security enforced)${DATABASE_CA_CERT ? '' : '; TLS certificate not verified (set DATABASE_CA_CERT)'}`);
+        for (const b of registry.list()) {
+            await syncBusiness(db, b);
+            // An order nobody hears about is worse than no order: require a way to tell staff.
+            if (b.workflows.restaurant_ordering && notificationChannels(b, emailService).length === 0) {
+                throw new Error(`${b.id} takes orders but has no working notification channel (email or webhook)`);
+            }
+        }
+        notifier.start(() => registry.list());
+        for (const b of registry.list()) notifier.deliverDue(b).catch(e => console.error(`❌ Startup delivery (${b.id}):`, e.message));
+
         await fastify.listen({ port: PORT, host: '0.0.0.0' });
         console.log(`🚀 Server running on port ${PORT}`);
         await runStartupHealthChecks();
     } catch (err) {
-        fastify.log.error(err);
+        console.error(`❌ Startup failed: ${err.message}`);
         process.exit(1);
     }
 })();
