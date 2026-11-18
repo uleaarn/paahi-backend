@@ -179,7 +179,7 @@ function itemsText(items) {
     }).join(', ');
 }
 
-/** Message for staff. Keeps the flat fields the existing email template and n8n flows use. */
+/** Message for staff. Keeps the flat fields the email template uses. */
 export function orderMessage(business, o) {
     const text = itemsText(o.items);
     return {

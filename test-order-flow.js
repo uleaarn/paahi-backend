@@ -455,15 +455,24 @@ function scriptedLLM(script) {
     };
 }
 
+function fakeEmailService() {
+    const emails = [];
+    return {
+        configured: true,
+        emails,
+        sendOrderConfirmation: async (msg, { to }) => { emails.push({ msg, to }); return { success: true }; },
+    };
+}
+
 async function newEngine(script, { clock = OPEN_TIME, submitter, callerPhone = null, languages, dialed = JALWA_NUMBER } = {}) {
-    const fetchImpl = fakeFetch();
-    const notifier = new Notifier({ db, fetchImpl, logger: quiet });
-    const make = actionsFactory({ db, notifier, logger: quiet });
+    const emailService = fakeEmailService();
+    const notifier = new Notifier({ db, emailService, logger: quiet });
+    const make = actionsFactory({ db, notifier, emailService, logger: quiet });
     const actions = {};
     const registry = buildRegistry({
         languages,
-        // Jalwa's business.json names N8N_WEBHOOK_URL as its optional webhook.
-        env: { N8N_WEBHOOK_URL: 'https://hooks.example/jalwa-montclair' },
+        // Jalwa's business.json names EMAIL_TO as its staff email.
+        env: { EMAIL_TO: 'kitchen@jalwa.test' },
         createSubmitter: b => (actions[b.id] = submitter || make(b)),
     });
     for (const b of registry.list()) await syncBusiness(db, b);
@@ -471,11 +480,11 @@ async function newEngine(script, { clock = OPEN_TIME, submitter, callerPhone = n
     const callId = nextCallId();
     const route = registry.resolve(dialed);
     const engine = createConversation({ route, callId, callerPhone, llm, model: 'test-model', clock, logger: quiet });
-    return { engine, order: engine.workflows[0].order, llm, fetchImpl, actions: actions[route.business.id], callId };
+    return { engine, order: engine.workflows[0].order, llm, emails: emailService.emails, actions: actions[route.business.id], callId };
 }
 
 test('happy path: pickup order is read back, confirmed, and submitted exactly once', async () => {
-    const { engine, order, fetchImpl, actions, callId } = await newEngine([
+    const { engine, order, emails, actions, callId } = await newEngine([
         toolsMsg(toolCall('add_item', { item: 'butter chicken', quantity: 2, spice_level: 'mild' })),
         textMsg('Got it, two mild Butter Chicken. Anything else?'),
         toolsMsg(toolCall('add_item', { item: 'garlic nan' })),
@@ -502,12 +511,12 @@ test('happy path: pickup order is read back, confirmed, and submitted exactly on
     assert.equal(saved[0].business_id, 'jalwa-montclair');
     assert.equal(saved[0].location_id, 'montclair');
     await actions.lastDelivery;
-    assert.equal(fetchImpl.calls.length, 1);
-    assert.equal(fetchImpl.calls[0].url, 'https://hooks.example/jalwa-montclair');
-    assert.equal(JSON.parse(fetchImpl.calls[0].init.body).business_id, 'jalwa-montclair');
+    assert.equal(emails.length, 1, 'kitchen emailed once');
+    assert.equal(emails[0].to, 'kitchen@jalwa.test');
+    assert.equal(emails[0].msg.business_id, 'jalwa-montclair');
     const after = await engine.handleUtterance('yes');
     assert.equal(after.endCall, true);
-    assert.equal(fetchImpl.calls.length, 1);
+    assert.equal(emails.length, 1);
     const state = engine.callState();
     assert.equal(state.business_id, 'jalwa-montclair');
     assert.equal(state.workflows.restaurant_ordering.status, 'submitted');
@@ -527,18 +536,18 @@ test('tenant isolation: a call to another business never sees Jalwa data', async
 });
 
 test('model cannot confirm in the same turn it read back', async () => {
-    const { engine, order, fetchImpl } = await newEngine([
+    const { engine, order, emails } = await newEngine([
         toolsMsg(toolCall('read_back_order'), toolCall('confirm_and_submit_order')),
     ]);
     fillPickup(order);
     const r = await engine.handleUtterance('yes that is everything');
     assert.match(r.say, /Let me read that back/);
     assert.equal(order.phase, PHASES.AWAITING_CONFIRMATION);
-    assert.equal(fetchImpl.calls.length, 0);
+    assert.equal(emails.length, 0);
 });
 
 test('a qualified "yes, but..." does not submit', async () => {
-    const { engine, order, fetchImpl } = await newEngine([
+    const { engine, order, emails } = await newEngine([
         toolsMsg(toolCall('read_back_order')),
         toolsMsg(toolCall('confirm_and_submit_order')),
         textMsg('Sure, what would you like to change?'),
@@ -547,7 +556,7 @@ test('a qualified "yes, but..." does not submit', async () => {
     await engine.handleUtterance("that's all");
     const r = await engine.handleUtterance('yes but add a mango lassi');
     assert.equal(r.endCall, false);
-    assert.equal(fetchImpl.calls.length, 0);
+    assert.equal(emails.length, 0);
     assert.notEqual(order.phase, PHASES.SUBMITTED);
 });
 
@@ -633,7 +642,7 @@ test('single-language business: no language tool offered', async () => {
 });
 
 test('language switch: Hindi readback, Hindi confirmation, structured order stays language-neutral', async () => {
-    const { engine, order, fetchImpl, llm, actions, callId } = await newEngine([
+    const { engine, order, emails, llm, actions, callId } = await newEngine([
         toolsMsg(toolCall('set_language', { language: 'hi' })),
         textMsg('ज़रूर, मैं हिन्दी में बात करता हूँ। आप क्या ऑर्डर करना चाहेंगे?'),
         toolsMsg(toolCall('read_back_order')),
@@ -652,8 +661,8 @@ test('language switch: Hindi readback, Hindi confirmation, structured order stay
     const done = await engine.handleUtterance('हाँ, सही है');
     assert.match(done.say, /आपका ऑर्डर लग गया है/);
     await actions.lastDelivery;
-    assert.equal(fetchImpl.calls.length, 1);
-    const sent = JSON.parse(fetchImpl.calls[0].init.body);
+    assert.equal(emails.length, 1);
+    const sent = emails[0].msg;
     assert.equal(sent.items_structured[0].name, 'Butter Chicken');
     assert.equal(sent.items_structured[0].spice_level, 'mild');
     const row = (await raw.query('select language, items from public.orders where call_sid = $1', [callId])).rows[0];

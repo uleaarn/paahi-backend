@@ -68,4 +68,4 @@ A confirmed order is saved in the database first. It is placed once saved. Then 
 
 ## n8n
 
-n8n is **not needed** for calls or orders. The only remaining use is as an optional downstream webhook. Jalwa's config points `webhook_url_env` at `N8N_WEBHOOK_URL` so an existing n8n flow keeps receiving orders if that variable is set. Leave it empty to drop n8n completely.
+Paahi doesn't use n8n. Calls, orders and staff alerts run entirely in this backend. A business can still name an optional webhook (`webhook_url_env`) if some other system should receive orders; Jalwa doesn't.

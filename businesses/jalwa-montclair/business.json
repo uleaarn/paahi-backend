@@ -51,6 +51,6 @@
     },
     "notifications": {
         "email_to_env": "EMAIL_TO",
-        "webhook_url_env": "N8N_WEBHOOK_URL"
+        "webhook_url_env": null
     }
 }
