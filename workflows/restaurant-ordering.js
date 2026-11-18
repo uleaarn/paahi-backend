@@ -155,7 +155,9 @@ class RestaurantOrderingSession {
     promptSection() {
         const typesText = this.orderTypes.join(' or ');
         const instructions = INSTRUCTIONS
-            .replaceAll('{{ORDER_TYPES}}', typesText)
+            .replaceAll('{{ORDER_TYPE_STEP}}', this.orderTypes.length === 1
+                ? `Every phone order is ${this.orderTypes[0]}; it's already set. Never ask about pickup or delivery.`
+                : `If you don't know yet, ask whether it's for ${typesText}. Call set_order_type.`)
             .replaceAll('{{ADDRESS_STEP}}', this.orderTypes.includes('delivery') ? ', then the delivery address if it is delivery' : '');
         return [
             instructions,

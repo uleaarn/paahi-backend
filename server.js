@@ -303,6 +303,9 @@ class VoiceSession {
         this.isPlaying = false;
         this.playTimer = null;
         this.currentStreamAbort = false;
+        this.replyGen = 0;            // bumps on interruption; stale audio chunks are dropped
+        this.streamingReply = false;  // a reply's audio is still arriving
+        this.audioCarry = Buffer.alloc(0); // partial 20 ms frame between streamed chunks
         this.isSpeaking = false;
         this.ttsStartTime = 0;
         this.hangupAfterPlayback = false;
@@ -368,7 +371,7 @@ class VoiceSession {
 
                 // Barge-in: caller starts talking over us -> stop our audio now,
                 // using interim results so we don't wait for the sentence to end.
-                if (transcript && this.isSpeaking && !isNoise(transcript) &&
+                if (transcript && (this.isSpeaking || this.streamingReply) && !isNoise(transcript) &&
                     transcript.split(/\s+/).length >= 2 && Date.now() - this.ttsStartTime > 600) {
                     this.stopPlaybackForBargeIn();
                 }
@@ -416,6 +419,7 @@ class VoiceSession {
         }
         console.log(`📝 CALLER (${trigger}): "${text}"`);
         this.lastUtteranceAt = Date.now();
+        this.firstChunkLogged = false;
         this.engine.event('stt_final', { trigger, chars: text.length, detected_language: detectedLanguage });
         this.utteranceQueue.push({ text, detectedLanguage });
         this.drainQueue();
@@ -481,30 +485,35 @@ class VoiceSession {
     }
 
     async synthesizeAndSend(text) {
+        const gen = ++this.replyGen;
+        this.ttsStartTime = Date.now();
+        this.streamingReply = true;
+        this.audioCarry = Buffer.alloc(0);
+        console.log(`🔊 Speaking: "${text.substring(0, 60)}..."`);
         try {
-            this.ttsStartTime = Date.now();
-            console.log(`🔊 Synthesizing: "${text.substring(0, 60)}..."`);
-
-            // The voice follows the call language (Deepgram Aura for English).
-            const result = await tts.synthesize(text, { business: this.business, language: this.engine.language });
-            const mulawBuffer = result.audio;
+            // Audio is played as it streams in (Deepgram Aura for English).
+            const result = await tts.stream(text, { business: this.business, language: this.engine.language }, async (chunk) => {
+                if (gen !== this.replyGen || this.closed) return; // caller interrupted: drop the rest
+                if (!this.firstAudioAt) {
+                    this.firstAudioAt = Date.now();
+                    this.engine.event('first_audio');
+                }
+                if (this.lastUtteranceAt && !this.firstChunkLogged) {
+                    this.firstChunkLogged = true;
+                    this.engine.event('reply_audio_started', { ms_since_caller_stopped: Date.now() - this.lastUtteranceAt });
+                }
+                this.enqueueMulaw(chunk);
+            });
+            if (gen === this.replyGen) this.enqueueMulaw(Buffer.alloc(0), { final: true });
             this.ttsFailures = 0;
-            this.engine.event('tts', { provider: result.provider, ms: result.ms, fell_back: result.fellBack });
-            console.log(`✅ TTS (${result.provider}${result.fellBack ? ', fallback' : ''}): ${(mulawBuffer.length / 8).toFixed(0)}ms of audio in ${result.ms}ms`);
-
-            if (!this.firstAudioAt) {
-                this.firstAudioAt = Date.now();
-                this.engine.event('first_audio');
-            }
-            if (this.lastUtteranceAt) {
-                this.engine.event('reply_audio_ready', { ms_since_caller_stopped: Date.now() - this.lastUtteranceAt });
-            }
-            this.enqueueMulaw(mulawBuffer);
-
+            this.engine.event('tts', { provider: result.provider, first_audio_ms: result.firstAudioMs, ms: result.ms, cached: result.cached, fell_back: result.fellBack });
+            console.log(`✅ TTS (${result.provider}${result.cached ? ', cached' : ''}${result.fellBack ? ', fallback' : ''}): first audio ${result.firstAudioMs}ms, ${(result.bytes / 8).toFixed(0)}ms of audio in ${result.ms}ms`);
         } catch (error) {
             console.error(`❌ TTS error: ${error.message}`);
             this.engine.event('tts_error', { error: error.message });
             await this.onVoiceFailure();
+        } finally {
+            if (gen === this.replyGen) this.streamingReply = false;
         }
     }
 
@@ -526,25 +535,27 @@ class VoiceSession {
         this.hangup('voice_unavailable');
     }
 
-    // Queue-based audio player
-    enqueueMulaw(mulawAudio) {
+    // Queue-based audio player. Streamed chunks arrive in arbitrary sizes, so a
+    // partial 20 ms frame is carried over to the next chunk instead of being
+    // padded with silence (which would click). Only the very end is padded.
+    enqueueMulaw(mulawAudio, { final = false } = {}) {
         const CHUNK_SIZE = 160;
+        let data = this.audioCarry.length ? Buffer.concat([this.audioCarry, mulawAudio]) : mulawAudio;
+        const whole = data.length - (data.length % CHUNK_SIZE);
+        for (let i = 0; i < whole; i += CHUNK_SIZE) this.outboundQueue.push(data.subarray(i, i + CHUNK_SIZE));
+        this.audioCarry = Buffer.from(data.subarray(whole));
 
-        // Split into 160-byte frames
-        for (let i = 0; i < mulawAudio.length; i += CHUNK_SIZE) {
-            let frame = mulawAudio.slice(i, i + CHUNK_SIZE);
-
-            // CRITICAL: Pad last frame to exactly 160 bytes with μ-law silence (0xFF)
-            if (frame.length < CHUNK_SIZE) {
-                const paddedFrame = Buffer.alloc(CHUNK_SIZE, 0xFF); // μ-law silence
-                frame.copy(paddedFrame);
-                frame = paddedFrame;
-            }
-
-            this.outboundQueue.push(frame);
+        if (final && this.audioCarry.length) {
+            const padded = Buffer.alloc(CHUNK_SIZE, 0xFF); // μ-law silence
+            this.audioCarry.copy(padded);
+            this.outboundQueue.push(padded);
+            this.audioCarry = Buffer.alloc(0);
         }
 
-        if (!this.isPlaying) this.startPlayer();
+        // Start once ~200 ms is buffered (or the reply is complete), so a slow
+        // network moment doesn't cause a stutter right at the start.
+        const START_FRAMES = 10;
+        if (!this.isPlaying && (final || this.outboundQueue.length >= START_FRAMES)) this.startPlayer();
     }
 
     startPlayer() {
@@ -598,9 +609,13 @@ class VoiceSession {
 
     stopPlaybackForBargeIn() {
         // Never cut off the goodbye; the call is ending anyway.
-        if (!this.isPlaying || this.hangupAfterPlayback) return;
+        if (!(this.isPlaying || this.streamingReply) || this.hangupAfterPlayback) return;
         console.log('🛑 Caller interrupted: stopping playback');
-        this.currentStreamAbort = true;
+        this.replyGen += 1;          // drop audio of this reply that is still streaming in
+        this.streamingReply = false;
+        this.audioCarry = Buffer.alloc(0);
+        if (this.isPlaying) this.currentStreamAbort = true;
+        else this.outboundQueue = [];
         this.isSpeaking = false;
         // Also drop audio Twilio has already buffered.
         this.sendToTwilio({ event: 'clear', streamSid: this.streamSid });
@@ -854,6 +869,18 @@ fastify.register(async (fastify) => {
             }
         }
         notifier.start(() => registry.list());
+
+        // Pre-generate each business's greeting so the first words of every call play instantly.
+        for (const b of registry.list()) {
+            const entry = registry.get(b.id);
+            const greeting = createConversation({
+                route: { business: b, submitter: entry.submitter, location: b.locations[0], routedBy: 'warmup' },
+                callId: 'warmup', llm: openai, model: LLM_MODEL,
+            }).greeting();
+            tts.stream(greeting, { business: b, language: b.languages.default }, async () => {})
+                .then(r => console.log(`🔥 Greeting ready for ${b.id} (${r.provider}, ${r.ms}ms)`))
+                .catch(e => console.error(`⚠️ Greeting warm-up failed for ${b.id}: ${e.message}`));
+        }
         for (const b of registry.list()) notifier.deliverDue(b).catch(e => console.error(`❌ Startup delivery (${b.id}):`, e.message));
 
         await fastify.listen({ port: PORT, host: '0.0.0.0' });
