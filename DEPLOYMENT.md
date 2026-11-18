@@ -20,7 +20,7 @@ This project is ready for Railway, Render, Fly.io, or any Node.js host that supp
 
 - `EMAIL_USER`, `EMAIL_PASS`: the sending account (Gmail app password).
 - One recipient variable per business, named in its business.json (`email_to_env`). For Jalwa that is `EMAIL_TO`.
-- Optional webhook per business (`webhook_url_env`). For Jalwa that is `N8N_WEBHOOK_URL`. Not needed for calls or orders.
+- Optional webhook per business (`webhook_url_env`). Jalwa doesn't use one.
 
 ## Other
 

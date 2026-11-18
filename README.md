@@ -5,7 +5,7 @@ Paahi is a phone voice agent that serves several businesses. Each business has i
 What exists today:
 - **One workflow:** restaurant phone ordering (pickup). Other workflows aren't built yet, and nothing here claims they are.
 - **Languages:** English (pilot). Spanish, French, Hindi and Telugu are wired end to end as **experimental**. See [docs/LANGUAGES.md](docs/LANGUAGES.md).
-- **No n8n needed.** Calls and orders run entirely in this backend. A webhook (for example an existing n8n flow) is optional and downstream only.
+- **No n8n.** Calls, orders and staff email alerts all run in this backend.
 
 ## How a call works
 
