@@ -22,7 +22,9 @@
             }
         }
     ],
-    "phone_numbers": [],
+    "phone_numbers": [
+        "+15513054339"
+    ],
     "languages": {
         "default": "en",
         "enabled": [
