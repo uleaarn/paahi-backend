@@ -17,6 +17,7 @@ import { createConversation, actionsFactory } from './call-factory.js';
 import { BusinessActions, Notifier, syncBusiness } from './business-actions.js';
 import { Database } from './database.js';
 import { createDevDatabase } from './dev-database.js';
+import { TextToSpeech } from './tts.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const menuData = JSON.parse(fs.readFileSync(path.join(__dirname, 'businesses', 'jalwa-montclair', 'menu.json'), 'utf-8'));
@@ -682,4 +683,46 @@ test('every enabled language has complete fixed phrases', () => {
         assert.ok(text.includes('Butter Chicken') && text.includes('Babu') && text.includes('9 7 3, 5 5 5, 1 2 3 4'), `${code}: ${text}`);
         assert.doesNotMatch(text, /undefined|null/, code);
     }
+});
+
+// ------------------------------------------------------------- voice (TTS)
+
+test('voice: English uses Deepgram Aura and asks for Twilio-ready audio', async () => {
+    const calls = [];
+    const fetchImpl = async (url, init) => {
+        calls.push({ url, init });
+        return { ok: true, status: 200, arrayBuffer: async () => new Uint8Array([0xff, 0x7f, 0x00]).buffer };
+    };
+    const tts = new TextToSpeech({ deepgramKey: 'dg-test', fetchImpl, logger: quiet });
+    const r = await tts.synthesize('Hello from Jalwa', { business: { languages: { voices: {} } }, language: 'en' });
+    assert.equal(r.provider, 'deepgram');
+    assert.equal(r.fellBack, false);
+    assert.deepEqual([...r.audio], [0xff, 0x7f, 0x00], 'μ-law bytes are passed through unchanged');
+    const u = new URL(calls[0].url);
+    assert.equal(u.origin + u.pathname, 'https://api.deepgram.com/v1/speak');
+    assert.equal(u.searchParams.get('model'), 'aura-2-thalia-en');
+    assert.equal(u.searchParams.get('encoding'), 'mulaw');
+    assert.equal(u.searchParams.get('sample_rate'), '8000');
+    assert.equal(u.searchParams.get('container'), 'none');
+    assert.equal(calls[0].init.headers.Authorization, 'Token dg-test');
+    assert.deepEqual(JSON.parse(calls[0].init.body), { text: 'Hello from Jalwa' });
+});
+
+test('voice: falls back to Google when Deepgram fails, and reports when nothing can speak', async () => {
+    const failing = async () => ({ ok: false, status: 402, text: async () => 'insufficient credits' });
+    const googleClient = { synthesizeSpeech: async () => [{ audioContent: Buffer.from(new Int16Array([0, 1000, -1000]).buffer) }] };
+    const withGoogle = new TextToSpeech({ deepgramKey: 'dg', googleClient, fetchImpl: failing, logger: quiet });
+    const r = await withGoogle.synthesize('Hi', { business: { languages: { voices: {} } }, language: 'en' });
+    assert.equal(r.provider, 'google');
+    assert.equal(r.fellBack, true);
+    assert.equal(r.audio.length, 3, 'one μ-law byte per 16-bit sample');
+
+    const deepgramOnly = new TextToSpeech({ deepgramKey: 'dg', fetchImpl: failing, logger: quiet });
+    await assert.rejects(deepgramOnly.synthesize('Hi', { business: { languages: { voices: {} } }, language: 'en' }), /HTTP 402/);
+});
+
+test('voice: startup check names languages that have no configured voice', () => {
+    const tts = new TextToSpeech({ deepgramKey: 'dg', logger: quiet }); // no Google credentials
+    assert.deepEqual(tts.missingVoices({ languages: { enabled: ['en'], voices: {} } }), []);
+    assert.deepEqual(tts.missingVoices({ languages: { enabled: ['en', 'hi', 'te'], voices: {} } }), ['hi', 'te']);
 });

@@ -2,14 +2,14 @@
 
 A language only counts as **supported** once the whole call works in it on live phone calls: recognition, conversation, business terms and voice. **No language has reached that bar yet**, English included, because no live call has been made with this code.
 
-Provider facts were checked against the Deepgram and Google Cloud documentation in November 2026.
+Provider facts were checked against the Deepgram and Google Cloud documentation in November 2026. Deepgram's Aura voices cover English, Spanish and French (not Hindi or Telugu).
 
 | | English `en` | Spanish `es` | French `fr` | Hindi `hi` | Telugu `te` |
 |---|---|---|---|---|---|
 | **Status in Paahi** | pilot | experimental | experimental | experimental | experimental |
 | **Speech recognition** (Deepgram nova-3) | yes | yes | yes | yes | yes (nova-3 only; nova-2 has no Telugu) |
 | **Mixed-language calls** (nova-3 `multi`, per-word language tags) | yes | yes | yes | yes | yes |
-| **Voice** (Google TTS, default) | `en-US-Neural2-D` | `es-US-Neural2-A` | `fr-FR-Neural2-F` | `hi-IN-Neural2-B` | `te-IN-Standard-A` (no Neural2 exists; Chirp3-HD is untested) |
+| **Voice** (default) | Deepgram `aura-2-thalia-en` (Google `en-US-Neural2-D` as backup) | Google `es-US-Neural2-A` | Google `fr-FR-Neural2-F` | Google `hi-IN-Neural2-B` (Sarvam planned) | Google `te-IN-Standard-A` (Sarvam planned) |
 | **Fixed phrases** (readback, confirmations, goodbyes) | written | draft, needs native review | draft, needs native review | draft, needs native review | draft, needs native review |
 | **"Yes" detection** for final confirmation | tested | tested offline, word list needs review | tested offline, word list needs review | tested offline, word list needs review | tested offline, word list needs review |
 | **Conversation** (DeepSeek `deepseek-chat`) | expected good | expected good | expected good | not measured | not measured; likely the weakest |
@@ -31,7 +31,8 @@ Provider facts were checked against the Deepgram and Google Cloud documentation 
 3. **Telugu voice quality.** Only Standard (older) and Chirp3-HD voices exist. Chirp3-HD at an 8 kHz phone sample rate hasn't been tested.
 4. **Indian dish names spoken by non-English voices,** and recognized in Hindi or Telugu speech. Deepgram keyterm prompting (nova-3) could help but isn't switched on yet.
 5. **Automatic language choice** relies on the model acting on the recognizer's hint. There's no hard rule yet, such as "switch after two utterances in language X".
-6. **The fallback when the voice provider is down** is silence. A Twilio `<Say>` fallback per language isn't built.
+6. **When no voice works:** each reply tries every configured voice provider for that language. After two failures in a row, Paahi records a staff callback request and ends the call, so the caller isn't left in silence.
+7. **Hindi and Telugu voices** come from Google today, which needs Google credentials with billing. The plan is to switch them to Sarvam (Bulbul), which is stronger for Indian languages.
 
 ## Before calling a language "supported"
 

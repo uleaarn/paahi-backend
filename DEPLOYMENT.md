@@ -8,7 +8,7 @@ This project is ready for Railway, Render, Fly.io, or any Node.js host that supp
 - `LLM_BASE_URL`
 - `LLM_MODEL`
 - `DEEPGRAM_API_KEY`
-- `GOOGLE_APPLICATION_CREDENTIALS_JSON`
+- `GOOGLE_APPLICATION_CREDENTIALS_JSON`: optional. Only needed for Spanish, French, Hindi or Telugu, or as a backup English voice. English uses Deepgram.
 - `DATABASE_URL`: Supabase Postgres as the `paahi_app` role (see `docs/DATABASE.md`). Optionally `DATABASE_CA_CERT`.
 
 ## Routing and Business Settings

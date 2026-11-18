@@ -17,6 +17,7 @@ import { createConversation, actionsFactory } from './call-factory.js';
 import { Database, pgAdapter } from './database.js';
 import { Notifier, syncBusiness, notificationChannels } from './business-actions.js';
 import { LANGUAGES } from './languages.js';
+import { TextToSpeech } from './tts.js';
 // Polyfill WebSocket for Deepgram SDK
 globalThis.WebSocket = WebSocket;
 
@@ -87,10 +88,11 @@ const openai = new OpenAI({
     baseURL: LLM_BASE_URL
 });
 const deepgram = createClient(DEEPGRAM_API_KEY);
-const ttsClient = new textToSpeech.TextToSpeechClient();
-if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    console.warn('⚠️ No Google Cloud credentials (GOOGLE_APPLICATION_CREDENTIALS_JSON): the agent cannot speak until they are set.');
-}
+// Voice: Deepgram Aura (same key as listening) for English; Google only if configured.
+const tts = new TextToSpeech({
+    deepgramKey: DEEPGRAM_API_KEY,
+    googleClient: process.env.GOOGLE_APPLICATION_CREDENTIALS ? new textToSpeech.TextToSpeechClient() : null,
+});
 
 // One failing provider call must never take down every live call. Some SDKs
 // (google-gax) reject internal promises nobody awaits; log them and keep serving.
@@ -110,12 +112,6 @@ function sttOptionsFor(business) {
     return { model, language: code === 'en' ? 'en-US' : LANGUAGES[code].stt, endpointing: 300 };
 }
 
-/** Text-to-speech voice for a business in a language (business override, else the registry default). */
-function ttsVoiceFor(business, language) {
-    const override = business.languages.voices[language];
-    const base = LANGUAGES[language].tts;
-    return { languageCode: override?.language_code || base.languageCode, name: override?.voice || base.voice };
-}
 
 // Deepgram WebSocket diagnostic probe
 async function probeDeepgramWebSocket() {
@@ -489,28 +485,12 @@ class VoiceSession {
             this.ttsStartTime = Date.now();
             console.log(`🔊 Synthesizing: "${text.substring(0, 60)}..."`);
 
-            // Google Cloud TTS returns LINEAR16 PCM @ 8kHz (shared client, created once).
-            // The voice follows the call language.
-            const voice = ttsVoiceFor(this.business, this.engine.language);
-            const [response] = await ttsClient.synthesizeSpeech({
-                input: { text },
-                voice,
-                // pitch is omitted: Chirp3-HD voices don't accept it.
-                audioConfig: { audioEncoding: 'LINEAR16', sampleRateHertz: 8000, speakingRate: 1.0 },
-            });
-
-            const pcm16Buffer = Buffer.isBuffer(response.audioContent)
-                ? response.audioContent
-                : Buffer.from(response.audioContent, 'base64');
-
-            // LINEAR16 from Google includes a WAV header; skip it so it isn't played as a click.
-            let pcm = pcm16Buffer;
-            if (pcm16Buffer.subarray(0, 4).toString('ascii') === 'RIFF') {
-                const dataAt = pcm16Buffer.indexOf('data', 12, 'ascii');
-                if (dataAt > 0) pcm = pcm16Buffer.subarray(dataAt + 8);
-            }
-            const mulawBuffer = AudioConverter.pcm16ToMulaw(pcm);
-            console.log(`✅ TTS ready: ${(pcm.length / 16).toFixed(0)}ms of audio in ${Date.now() - this.ttsStartTime}ms`);
+            // The voice follows the call language (Deepgram Aura for English).
+            const result = await tts.synthesize(text, { business: this.business, language: this.engine.language });
+            const mulawBuffer = result.audio;
+            this.ttsFailures = 0;
+            this.engine.event('tts', { provider: result.provider, ms: result.ms, fell_back: result.fellBack });
+            console.log(`✅ TTS (${result.provider}${result.fellBack ? ', fallback' : ''}): ${(mulawBuffer.length / 8).toFixed(0)}ms of audio in ${result.ms}ms`);
 
             if (!this.firstAudioAt) {
                 this.firstAudioAt = Date.now();
@@ -522,9 +502,28 @@ class VoiceSession {
             this.enqueueMulaw(mulawBuffer);
 
         } catch (error) {
-            console.error(`❌ TTS error:`, error);
+            console.error(`❌ TTS error: ${error.message}`);
             this.engine.event('tts_error', { error: error.message });
+            await this.onVoiceFailure();
         }
+    }
+
+    /**
+     * The caller can't hear us. Don't leave them in silence: after two voice
+     * failures in a row (every configured provider already tried each time),
+     * record a staff callback and hang up.
+     */
+    async onVoiceFailure() {
+        this.ttsFailures = (this.ttsFailures || 0) + 1;
+        if (this.voiceGaveUp || this.ttsFailures < 2) return;
+        this.voiceGaveUp = true;
+        console.error('📴 Voice unavailable: requesting a staff callback and ending the call');
+        try {
+            await this.engine.failToCallback('voice_unavailable');
+        } catch (e) {
+            console.error('❌ Callback request failed:', e.message);
+        }
+        this.hangup('voice_unavailable');
     }
 
     // Queue-based audio player
@@ -845,6 +844,9 @@ fastify.register(async (fastify) => {
         const { role } = await db.checkTenantSafety();
         console.log(`🗄️ Database connected as ${role} (row-level security enforced)${DATABASE_CA_CERT ? '' : '; TLS certificate not verified (set DATABASE_CA_CERT)'}`);
         for (const b of registry.list()) {
+            // Every enabled language needs a working voice (e.g. Hindi/Telugu need Google credentials today).
+            const missing = tts.missingVoices(b);
+            if (missing.length) throw new Error(`${b.id}: no configured voice for ${missing.join(', ')}`);
             await syncBusiness(db, b);
             // An order nobody hears about is worse than no order: require a way to tell staff.
             if (b.workflows.restaurant_ordering && notificationChannels(b, emailService).length === 0) {
