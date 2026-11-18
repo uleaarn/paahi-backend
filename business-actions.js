@@ -187,6 +187,13 @@ function pickupText(business, at) {
     }).format(new Date(at));
 }
 
+/** "Wed, Nov 18, 11:25 AM" in the business's time zone. */
+function placedText(business, at) {
+    return new Intl.DateTimeFormat('en-US', {
+        timeZone: business.timezone || 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+    }).format(new Date(at));
+}
+
 export function orderMessage(business, o) {
     const text = itemsText(o.items);
     const pickup = o.pickup_at ? pickupText(business, o.pickup_at) : null;
@@ -203,6 +210,10 @@ export function orderMessage(business, o) {
         customer_phone: formatPhone(o.customer_phone),
         delivery_address: o.delivery_address,
         pickup_time: pickup || 'ASAP',
+        placed_text: placedText(business, o.created_at),
+        order_notes: o.order_notes || null,
+        allergy_notes: o.allergy_notes || null,
+        language: o.language || 'en',
         items: text,
         subtotal: Number(o.subtotal),
         order_summary: [
@@ -231,6 +242,10 @@ export function callbackMessage(business, c) {
         timestamp: new Date(c.created_at).toISOString(),
         customer_name: c.customer_name || 'Unknown caller',
         customer_phone: formatPhone(c.customer_phone),
+        placed_text: placedText(business, c.created_at),
+        reason: c.reason,
+        language: c.language || 'en',
+        mentioned_items: snap?.items?.length ? snap.items.map(l => `${l.quantity} x ${l.name}`) : [],
         items: 'CALLBACK REQUEST — no order placed',
         order_summary: `Please call this customer back${c.language && c.language !== 'en' ? ` (caller's language: ${c.language})` : ''}. Reason: ${c.reason}.` +
             (snap?.items?.length ? ` Unsubmitted items they mentioned: ${snap.items.map(l => `${l.quantity} x ${l.name}`).join(', ')}.` : ''),

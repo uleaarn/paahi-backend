@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import { ticketHtml, ticketText, ticketSubject } from './staff-ticket.js';
 
 dotenv.config();
 
@@ -11,8 +12,6 @@ const EMAIL_USER = process.env.EMAIL_USER;
 const EMAIL_PASS = process.env.EMAIL_PASS;
 const EMAIL_TO = process.env.EMAIL_TO || 'orders@example.com';
 const RESTAURANT_NAME = process.env.RESTAURANT_NAME || 'Your Restaurant';
-const RESTAURANT_LOCATION = process.env.RESTAURANT_LOCATION || '';
-const RESTAURANT_PHONE = process.env.RESTAURANT_PHONE || '';
 
 /**
  * Email Service for Order Notifications
@@ -66,189 +65,11 @@ export class EmailService {
         }
     }
 
-    /**
-     * Format order data as HTML email
-     * @param {Object} orderData - Order information
-     * @returns {string} HTML email content
-     */
+    /** Print-friendly staff ticket (see staff-ticket.js). */
     formatOrderEmail(orderData) {
-        const {
-            customer_name,
-            customer_phone,
-            items,
-            order_summary,
-            timestamp,
-            session_id,
-            business_name = RESTAURANT_NAME
-        } = orderData;
-
-        const formattedTime = new Date(timestamp).toLocaleString('en-US', {
-            timeZone: 'America/New_York',
-            dateStyle: 'full',
-            timeStyle: 'short'
-        });
-
-        return `
-<!DOCTYPE html>
-<html>
-<head>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
-            border-radius: 10px 10px 0 0;
-            text-align: center;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 28px;
-        }
-        .content {
-            background: #f9f9f9;
-            padding: 30px;
-            border: 1px solid #ddd;
-            border-top: none;
-        }
-        .section {
-            background: white;
-            padding: 20px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .section h2 {
-            margin-top: 0;
-            color: #667eea;
-            font-size: 18px;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 10px;
-        }
-        .info-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid #eee;
-        }
-        .info-row:last-child {
-            border-bottom: none;
-        }
-        .label {
-            font-weight: bold;
-            color: #555;
-        }
-        .value {
-            color: #333;
-        }
-        .items-list {
-            background: #fff8e1;
-            padding: 15px;
-            border-left: 4px solid #ffc107;
-            margin: 10px 0;
-        }
-        .footer {
-            text-align: center;
-            padding: 20px;
-            color: #777;
-            font-size: 12px;
-        }
-        .badge {
-            display: inline-block;
-            background: #4caf50;
-            color: white;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: bold;
-        }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>🎉 New Phone Order Received!</h1>
-        <p style="margin: 10px 0 0 0; font-size: 16px;">${business_name}</p>
-    </div>
-    
-    <div class="content">
-        <div class="section">
-            <h2>📞 Customer Information</h2>
-            <div class="info-row">
-                <span class="label">Name:</span>
-                <span class="value">${customer_name || 'Not provided'}</span>
-            </div>
-            <div class="info-row">
-                <span class="label">Phone:</span>
-                <span class="value">${customer_phone || 'Not provided'}</span>
-            </div>
-            <div class="info-row">
-                <span class="label">Order Time:</span>
-                <span class="value">${formattedTime}</span>
-            </div>
-        </div>
-
-        <div class="section">
-            <h2>🍛 Order Details</h2>
-            <div class="items-list">
-                <strong>Items:</strong><br>
-                ${items || 'See order summary below'}
-            </div>
-            ${order_summary ? `
-            <div style="margin-top: 15px;">
-                <strong>Summary:</strong><br>
-                ${order_summary}
-            </div>
-            ` : ''}
-        </div>
-
-        <div class="section">
-            <h2>⏱️ Preparation Time</h2>
-            <p style="margin: 10px 0;">
-                <span class="badge">Ready in 25-30 minutes</span>
-            </p>
-            <p style="margin: 10px 0; color: #666; font-size: 14px;">
-                Customer has been notified of pickup time
-            </p>
-        </div>
-
-        <div class="section">
-            <h2>🔍 Technical Details</h2>
-            <div class="info-row">
-                <span class="label">Order Source:</span>
-                <span class="value">Voice Call (AI Agent)</span>
-            </div>
-            <div class="info-row">
-                <span class="label">Session ID:</span>
-                <span class="value" style="font-family: monospace; font-size: 11px;">${session_id || 'N/A'}</span>
-            </div>
-        </div>
-    </div>
-
-    <div class="footer">
-        <p>This is an automated notification from Paahi for ${business_name}</p>
-        <p>${[RESTAURANT_LOCATION, RESTAURANT_PHONE].filter(Boolean).join(' | ')}</p>
-    </div>
-</body>
-</html>
-        `;
+        return ticketHtml(orderData);
     }
 
-    /**
-     * Send order confirmation email
-     * @param {Object} orderData - Order information
-     * @returns {Promise<Object>} Result of email send
-     */
-    /**
-     * @param {object} orderData
-     * @param {{ to?: string, businessName?: string }} [options] per-business recipient and name
-     */
     /** Send through Resend's HTTPS API. The idempotency key stops duplicates on retry. */
     async sendViaResend({ from, to, subject, html, text }, idempotencyKey) {
         const controller = new AbortController();
@@ -282,15 +103,14 @@ export class EmailService {
 
         try {
             const htmlContent = this.formatOrderEmail({ ...orderData, business_name: businessName });
-            const scheduled = orderData.pickup_time && orderData.pickup_time !== 'ASAP' ? ` (SCHEDULED ${orderData.pickup_time})` : '';
-            const subject = `${orderData.type === 'callback_request' ? 'CALL BACK' : 'New Order'}: ${orderData.customer_name || 'Customer'} - ${new Date(orderData.timestamp).toLocaleTimeString('en-US', { timeZone: 'America/New_York' })}${scheduled}`;
+            const subject = ticketSubject(orderData);
 
             const mailOptions = {
                 from: `"${businessName} via Paahi" <${this.provider === 'resend' ? this.resendFrom : EMAIL_USER}>`,
                 to,
                 subject: subject,
                 html: htmlContent,
-                text: `New order from ${orderData.customer_name || 'Customer'}\nPhone: ${orderData.customer_phone}\nItems: ${orderData.items}\n\nOrder Summary: ${orderData.order_summary}`
+                text: ticketText(orderData),
             };
 
             console.log(`📧 Sending ${orderData.type === 'callback_request' ? 'callback request' : 'order'} email for ${businessName}...`);
