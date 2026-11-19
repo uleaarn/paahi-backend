@@ -56,7 +56,9 @@ export class OrderState {
      * @param {boolean} [opts.deliveryEnabled]
      * @param {() => Date} [opts.clock]
      */
-    constructor({ callId, menu, deliveryEnabled = false, clock = () => new Date(), timeZone = 'America/New_York' }) {
+    constructor({ callId, menu, deliveryEnabled = false, clock = () => new Date(), timeZone = 'America/New_York', taxRatePercent = null, orderIndex = 1 }) {
+        this.taxRatePercent = taxRatePercent;
+        this.orderIndex = orderIndex; // 2nd order in the same call gets its own idempotency key
         this.menu = menu;
         this.deliveryEnabled = deliveryEnabled;
         this.clock = clock;
@@ -360,6 +362,7 @@ export class OrderState {
             address: type === 'delivery' ? c.delivery_address : null,
             when: this.pickupLabel(language),
             subtotal: p.money(this.data.subtotal),
+            total: this.taxRatePercent ? p.money(this.totalWithTax()) : null,
             phone: speakPhone(c.phone),
         }).filter(Boolean);
 
@@ -422,7 +425,11 @@ export class OrderState {
 
     /** Idempotency key: one order per call. */
     idempotencyKey() {
-        return `paahi:${this.data.call_id}:order`;
+        return `paahi:${this.data.call_id}:order${this.orderIndex > 1 ? `:${this.orderIndex}` : ''}`;
+    }
+
+    totalWithTax() {
+        return Math.round(this.data.subtotal * (100 + this.taxRatePercent)) / 100;
     }
 
     snapshot() {

@@ -389,6 +389,27 @@ export function checkPickupTime(hours, { day, date, time }, { now, timeZone, min
     return { ok: true, at, understood };
 }
 
+/** Earliest acceptable pickup from now (lead time, opening hours, closing buffer). */
+export function earliestPickup(hours, now, timeZone, { minLeadMinutes = 20, maxDaysAhead = 7, closingBufferMinutes = 15 } = {}) {
+    const step = 5 * 60000;
+    let t = new Date(Math.ceil((now.getTime() + minLeadMinutes * 60000) / step) * step);
+    for (let i = 0; i < 20; i++) {
+        const p = zonedParts(t, timeZone);
+        const ranges = dayRanges(hours?.[p.day]);
+        if (ranges === null) return null;
+        const inside = ranges.find(([s, e]) => p.minutes >= s && p.minutes <= e - closingBufferMinutes);
+        if (inside) return t;
+        const next = nextOpening(hours, t, timeZone, maxDaysAhead);
+        if (!next) return null;
+        t = next;
+    }
+    return null;
+}
+
+export function whenText(at, timeZone) {
+    return whenLabel(at, timeZone);
+}
+
 /** Is a menu category available at this instant? (e.g. lunch specials Mon-Thu 11:30-3) */
 export function categoryAvailableAt(category, at, timeZone) {
     const a = category?.available;

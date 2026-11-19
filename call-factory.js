@@ -18,7 +18,7 @@ export const CORE_INSTRUCTIONS = fs.readFileSync(path.join(__dirname, 'prompts',
 export function createConversation({ route, callId, callerPhone = null, llm, model, clock, allowOrdersWhenClosed = false, llmTimeoutMs, logger }) {
     const { business, submitter, location, routedBy } = route;
     const workflows = Object.values(business.workflows).map(({ module, prepared }) =>
-        module.createSession({ prepared, callId, clock, submitter, business, location }));
+        module.createSession({ prepared, callId, clock, submitter, business, location, callerPhone }));
     return new ConversationEngine({
         llm, model, business, location, workflows, submitter,
         instructions: CORE_INSTRUCTIONS,

@@ -64,6 +64,48 @@ export class BusinessActions {
     }
 
     /**
+     * A caller's active orders, by callback number (this business only, via RLS).
+     * Active = confirmed/accepted and not long past its pickup time.
+     */
+    async findOrders({ phone, now = new Date() }) {
+        if (!phone) return [];
+        // Times come from the app clock (confirmed_at, pickup_at), not the database's now().
+        return this.db.forBusiness(this.business.id, async tx => (await tx.query(
+            `select id, call_sid, customer_name, pickup_at, confirmed_at as created_at, items, subtotal, status
+               from public.orders
+              where business_id = $1 and customer_phone = $2 and status in ('confirmed', 'accepted')
+                and coalesce(pickup_at, confirmed_at + interval '2 hours') > $3::timestamptz - interval '30 minutes'
+              order by coalesce(pickup_at, confirmed_at)
+              limit 5`, [this.business.id, phone, now.toISOString()])).rows);
+    }
+
+    /** Cancel an active order and queue a CANCELLED notice to staff. */
+    async cancelOrder({ orderId }) {
+        const channels = this.channels();
+        let result;
+        try {
+            result = await this.db.forBusiness(this.business.id, async tx => {
+                const updated = await tx.query(
+                    `update public.orders set status = 'cancelled', cancelled_at = now()
+                      where business_id = $1 and id = $2 and status in ('confirmed', 'accepted')
+                      returning id`, [this.business.id, orderId]);
+                if (updated.rows.length === 0) return { success: false, error: 'not_cancellable' };
+                for (const channel of channels) {
+                    await tx.query(
+                        `insert into public.notifications (business_id, order_id, channel, kind) values ($1, $2, $3, 'order_cancelled')
+                         on conflict do nothing`, [this.business.id, orderId, channel]);
+                }
+                return { success: true };
+            });
+        } catch (error) {
+            this.log.error(`❌ Cancel failed (${this.business.id}):`, error.message);
+            return { success: false, error: 'database_write_failed' };
+        }
+        if (result.success && channels.length) this.kickDelivery();
+        return result;
+    }
+
+    /**
      * Save a confirmed order exactly once per idempotency key.
      * @returns {Promise<{success: boolean, order_id?: string, duplicate?: boolean, error?: string}>}
      */
@@ -129,7 +171,7 @@ export class BusinessActions {
                 const id = inserted.rows[0].id;
                 for (const channel of channels) {
                     await tx.query(
-                        'insert into public.notifications (business_id, callback_request_id, channel) values ($1, $2, $3)',
+                        "insert into public.notifications (business_id, callback_request_id, channel, kind) values ($1, $2, $3, 'callback')",
                         [this.business.id, id, channel]);
                 }
                 return { success: true, callback_request_id: id, duplicate: false };
@@ -216,6 +258,7 @@ export function orderMessage(business, o) {
         language: o.language || 'en',
         items: text,
         subtotal: Number(o.subtotal),
+        tax_rate_percent: business.taxRatePercent ?? null,
         order_summary: [
             `${o.order_type === 'delivery' ? 'DELIVERY' : 'PICKUP'} order`,
             pickup ? `SCHEDULED for ${pickup}` : 'Pickup: as soon as possible',
@@ -311,7 +354,9 @@ export class Notifier {
                 const message = await this.db.forBusiness(business.id, async tx => {
                     if (row.order_id) {
                         const o = (await tx.query('select * from public.orders where id = $1', [row.order_id])).rows[0];
-                        return o ? orderMessage(business, o) : null;
+                        if (!o) return null;
+                        const m = orderMessage(business, o);
+                        return row.kind === 'order_cancelled' ? { ...m, type: 'order_cancelled' } : m;
                     }
                     const c = (await tx.query('select * from public.callback_requests where id = $1', [row.callback_request_id])).rows[0];
                     return c ? callbackMessage(business, c) : null;

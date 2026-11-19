@@ -12,7 +12,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { MenuService, openStatus, checkPickupTime, nextOpening } from './menu-service.js';
 import { EmailService } from './email-service.js';
-import { ticketHtml, ticketText, ticketSubject } from './staff-ticket.js';
+import { ticketHtml, ticketText, ticketSubject, orderRef } from './staff-ticket.js';
 import { OrderState, PHASES, isExplicitConfirmation, normalizePhone } from './order-state.js';
 import { BusinessRegistry } from './business-registry.js';
 import { createConversation, actionsFactory } from './call-factory.js';
@@ -497,6 +497,7 @@ test('happy path: pickup order is read back, confirmed, and submitted exactly on
         textMsg('Thanks, Babu. And a callback number?'),
         toolsMsg(toolCall('set_customer', { phone: '973 555 1234' }), toolCall('read_back_order')),
         toolsMsg(toolCall('confirm_and_submit_order')),
+        toolsMsg(toolCall('end_call')),
     ]);
     assert.match(engine.greeting(), /Thank you for calling Jalwa\. This is Paahi/);
     assert.equal(order.data.intent, 'pickup', 'pickup-only business sets the order type itself');
@@ -507,10 +508,11 @@ test('happy path: pickup order is read back, confirmed, and submitted exactly on
     assert.match(rb.say, /^Let me read that back\. A pickup order for Babu: two Butter Chicken, mild; one Garlic Naan\./);
     assert.equal(rb.endCall, false);
     const done = await engine.handleUtterance("Yes, that's correct");
-    assert.match(done.say, /your order is in/);
-    assert.equal(done.endCall, true);
+    assert.match(done.say, /^Your order is placed, Babu\. Your order number is [0-9A-F] [0-9A-F] [0-9A-F] [0-9A-F]\. Your total is \$\d+\.\d\d before tax\. Is there anything else I can help you with\?$/);
+    assert.equal(done.endCall, false, 'line stays open after the confirmation');
     assert.equal(order.phase, PHASES.SUBMITTED);
     const saved = (await raw.query('select * from public.orders where call_sid = $1', [callId])).rows;
+    assert.ok(done.say.includes(orderRef(saved[0].id).split('').join(' ')), 'spoken order number matches the saved order');
     assert.equal(saved.length, 1, 'order is in the database');
     assert.equal(saved[0].business_id, 'jalwa-montclair');
     assert.equal(saved[0].location_id, 'montclair');
@@ -518,8 +520,9 @@ test('happy path: pickup order is read back, confirmed, and submitted exactly on
     assert.equal(emails.length, 1, 'kitchen emailed once');
     assert.equal(emails[0].to, 'kitchen@jalwa.test');
     assert.equal(emails[0].msg.business_id, 'jalwa-montclair');
-    const after = await engine.handleUtterance('yes');
+    const after = await engine.handleUtterance("no, that's all, bye");
     assert.equal(after.endCall, true);
+    assert.match(after.say, /Goodbye/);
     assert.equal(emails.length, 1);
     const state = engine.callState();
     assert.equal(state.business_id, 'jalwa-montclair');
@@ -608,7 +611,8 @@ test('business closed, scheduled orders on: order is taken for a pickup time aft
     const rb = await engine.handleUtterance('Babu, 973 555 1234');
     assert.match(rb.say, /A pickup order for Babu: one Butter Chicken\. Pickup today at 5:00 PM\./);
     const done = await engine.handleUtterance('Yes, that is right');
-    assert.equal(done.endCall, true);
+    assert.match(done.say, /Pickup today at 5:00 PM\./);
+    assert.equal(done.endCall, false);
     const saved = (await raw.query('select pickup_at from public.orders where call_sid = $1', [callId])).rows;
     assert.equal(new Date(saved[0].pickup_at).toISOString(), '2026-11-17T22:00:00.000Z');
     await actions.lastDelivery;
@@ -707,7 +711,9 @@ test('caller asks for a person: callback request goes to that business only', as
     const submitter = fakeCallbackSubmitter();
     const { engine } = await newEngine([toolsMsg(toolCall('request_human', { reason: 'caller asked for manager' }))], { submitter, callerPhone: '9735550000' });
     const r = await engine.handleUtterance('let me talk to a manager');
-    assert.equal(r.handoff, true);
+    assert.equal(r.handoff, false, 'staff note; the call stays open');
+    assert.equal(r.endCall, false);
+    assert.match(r.say, /call you back at 9 7 3, 5 5 5, 0 0 0 0 about that\. Is there anything else/);
     assert.equal(submitter.callbacks[0].reason, 'caller asked for manager');
     assert.match(submitter.callbacks[0].call_id, /^CA_test_/);
     assert.equal(submitter.callbacks[0].locationId, 'montclair');
@@ -920,8 +926,8 @@ test('staff ticket: compact, print-friendly, escaped, and says only what is true
     assert.match(html, /&lt;b&gt;Babu&lt;\/b&gt;/, 'caller text is escaped');
     assert.doesNotMatch(html, /Ready in|notified|gradient|background:#(?!fff)/i, 'no invented promises, no colored blocks');
     assert.doesNotMatch(html, /[\u{1F300}-\u{1FAFF}]/u, 'no emojis');
-    assert.equal(ticketSubject(m), 'Pickup order 7C1E9A42: <b>Babu</b>, SCHEDULED Wednesday, Nov 18, 5:30 PM, ALLERGY');
-    assert.match(ticketText(m), /^Jalwa - PICKUP ORDER #7C1E9A42\nPICKUP: SCHEDULED Wednesday, Nov 18, 5:30 PM/);
+    assert.equal(ticketSubject(m), 'Pickup order 7C1E: <b>Babu</b>, SCHEDULED Wednesday, Nov 18, 5:30 PM, ALLERGY');
+    assert.match(ticketText(m), /^Jalwa - PICKUP ORDER #7C1E\nPICKUP: SCHEDULED Wednesday, Nov 18, 5:30 PM/);
     const asap = ticketHtml({ ...m, pickup_time: 'ASAP' });
     assert.match(asap, /PICKUP:<\/b> As soon as possible/);
 });
@@ -931,8 +937,8 @@ test('missing callback number: Paahi offers Caller ID and keeps the call going i
         toolsMsg(toolCall('add_item', { item: 'butter chicken' }), toolCall('set_customer', { name: 'Babu' }), toolCall('read_back_order')),
         textMsg('I just need a callback number.'),
         toolsMsg(toolCall('request_human', { reason: 'Caller cannot provide a callback phone number' })),
-        textMsg('No problem. Is 973-555-0000, the number you are calling from, OK?'),
-    ], { callerPhone: '9735550000' });
+        textMsg('No problem, take your time.'),
+    ]);
     const first = await engine.handleUtterance('one butter chicken for Babu');
     assert.equal(first.endCall, false);
     const missing = engine.events.find(e => e.type === 'tool' && e.name === 'read_back_order');
@@ -941,7 +947,7 @@ test('missing callback number: Paahi offers Caller ID and keeps the call going i
     assert.equal(r.endCall, false, 'call stays up');
     assert.equal(engine.handoff, null);
     assert.ok(engine.events.some(e => e.type === 'handoff_deferred'));
-    assert.match(r.say, /calling from/);
+    assert.match(r.say, /take your time/);
     assert.notEqual(order.phase, PHASES.HANDOFF);
 });
 
@@ -984,7 +990,8 @@ test('side request during an order: staff get a note, the order stays open and c
     assert.equal(notes.length, 1);
     await engine.handleUtterance('yes, place it');
     const done = await engine.handleUtterance('yes, correct');
-    assert.equal(done.endCall, true);
+    assert.match(done.say, /^Your order is placed/);
+    assert.equal(done.endCall, false);
     assert.equal(order.phase, PHASES.SUBMITTED);
     assert.equal((await raw.query('select count(*)::int as n from public.orders where call_sid = $1', [callId])).rows[0].n, 1);
 });
@@ -1019,6 +1026,154 @@ test('a readback the caller talked over must be read again before confirming', a
     assert.ok(engine.events.some(e => e.type === 'tool' && e.error === 'readback_was_interrupted'));
     assert.match(again.say, /^Let me read that back/);
     const done = await engine.handleUtterance('yes, that is right');
-    assert.equal(done.endCall, true);
+    assert.match(done.say, /^Your order is placed/);
     assert.equal(order.phase, PHASES.SUBMITTED);
+});
+
+// ------------------------------------------------------ existing orders (lookup, cancel, duplicates)
+
+async function placeOrder(callerPhone, { item = 'butter chicken', name = 'Uday' } = {}) {
+    const { engine, actions } = await newEngine([
+        toolsMsg(toolCall('add_item', { item }), toolCall('set_customer', { name }), toolCall('read_back_order')),
+        toolsMsg(toolCall('confirm_and_submit_order')),
+    ], { callerPhone });
+    await engine.handleUtterance(`one ${item} for ${name}`);
+    const done = await engine.handleUtterance('yes, correct');
+    await actions.lastDelivery;
+    return done;
+}
+
+test('Caller ID is the callback number by default, and the readback says it so the caller can change it', async () => {
+    const { engine, order } = await newEngine([
+        toolsMsg(toolCall('add_item', { item: 'butter chicken' }), toolCall('set_customer', { name: 'Uday' }), toolCall('read_back_order')),
+    ], { callerPhone: '+1 551 555 0123' });
+    const rb = await engine.handleUtterance('one butter chicken for Uday');
+    assert.equal(order.data.customer.phone, '5515550123');
+    assert.match(rb.say, /callback number is 5 5 1, 5 5 5, 0 1 2 3\./);
+});
+
+test('find and cancel an earlier order by phone; staff get a CANCELLED ticket', async () => {
+    const phone = '5515550144';
+    await placeOrder(phone);
+    const { engine, actions, emails, llm } = await newEngine([
+        toolsMsg(toolCall('find_my_orders', {})),
+        textMsg('I found one order with one Butter Chicken. Should I cancel it?'),
+        toolsMsg(toolCall('cancel_order', { order_number: 'PLACEHOLDER' })),
+        textMsg('Order is cancelled.'),
+    ], { callerPhone: phone });
+    await engine.handleUtterance('do I have an order?');
+    const lookup = JSON.parse(engine.messages.find(m => m.role === 'tool').content);
+    assert.equal(lookup.orders.length, 1);
+    assert.match(lookup.orders[0].items, /1 x Butter Chicken/);
+    const ref = lookup.orders[0].order_number;
+    assert.match(ref, /^[0-9A-F]{4}$/);
+    // Point the scripted cancel at the order number the lookup returned.
+    const original = llm.chat.completions.create;
+    llm.chat.completions.create = async req => {
+        const r = await original(req);
+        const tc = r.choices[0].message.tool_calls?.[0];
+        if (tc?.function.name === 'cancel_order') tc.function.arguments = JSON.stringify({ order_number: ref });
+        return r;
+    };
+    await engine.handleUtterance('yes, cancel it');
+    assert.ok(engine.events.some(e => e.type === 'order_cancelled' && e.order_number === ref));
+    const row = (await raw.query('select status, cancelled_at from public.orders where customer_phone = $1', [phone])).rows[0];
+    assert.equal(row.status, 'cancelled');
+    assert.ok(row.cancelled_at);
+    await actions.lastDelivery;
+    const cancelEmail = emails.find(e => e.msg.type === 'order_cancelled');
+    assert.ok(cancelEmail, 'staff told');
+    assert.ok(ticketSubject(cancelEmail.msg).startsWith(`CANCELLED order ${ref}: Uday`));
+    assert.match(ticketHtml(cancelEmail.msg), /Do not prepare this order/);
+});
+
+test('cancelling works only on orders found in this call', async () => {
+    const phone = '5515550155';
+    await placeOrder(phone);
+    const { engine } = await newEngine([
+        toolsMsg(toolCall('cancel_order', { order_number: 'ZZZZ' })),
+        textMsg('Let me look that up first.'),
+    ], { callerPhone: phone });
+    await engine.handleUtterance('cancel my order');
+    assert.ok(engine.events.some(e => e.type === 'tool' && e.error === 'unknown_order_number'));
+    const still = (await raw.query('select status from public.orders where customer_phone = $1', [phone])).rows[0];
+    assert.equal(still.status, 'confirmed');
+});
+
+test('another number needs the name on the order before anything is read out', async () => {
+    const phone = '5515550166';
+    await placeOrder(phone, { name: 'Uday Kiran' });
+    const { engine } = await newEngine([
+        toolsMsg(toolCall('find_my_orders', { phone: '551 555 0166' })),
+        textMsg('What name is the order under?'),
+        toolsMsg(toolCall('find_my_orders', { phone: '551 555 0166', name: 'Someone' })),
+        textMsg('Nothing under that name.'),
+        toolsMsg(toolCall('find_my_orders', { phone: '551 555 0166', name: 'uday' })),
+        textMsg('Found it.'),
+    ], { callerPhone: '9735550000' });
+    await engine.handleUtterance('check the order for 551 555 0166');
+    assert.ok(engine.events.some(e => e.type === 'tool' && e.error === 'name_needed'));
+    await engine.handleUtterance('Someone');
+    await engine.handleUtterance('Uday');
+    const results = engine.messages.filter(m => m.role === 'tool').map(m => JSON.parse(m.content));
+    assert.equal(results[1].orders.length, 0);
+    assert.equal(results[2].orders.length, 1);
+});
+
+test('possible duplicate: readback tells the model this number already has an order that day', async () => {
+    const phone = '5515550177';
+    await placeOrder(phone);
+    const { engine } = await newEngine([
+        toolsMsg(toolCall('add_item', { item: 'garlic naan' }), toolCall('set_customer', { name: 'Uday' }), toolCall('read_back_order')),
+    ], { callerPhone: phone });
+    await engine.handleUtterance('one garlic naan for Uday');
+    const rb = engine.messages.filter(m => m.role === 'tool').map(m => JSON.parse(m.content)).find(r => r.existing_orders_same_day);
+    assert.ok(rb, 'model is warned');
+    assert.match(rb.note, /in addition to it or replaces it/);
+    assert.ok(engine.events.some(e => e.type === 'possible_duplicate'));
+});
+
+test('after placing an order the caller can order more: a second order with its own number', async () => {
+    const { engine, callId } = await newEngine([
+        toolsMsg(toolCall('add_item', { item: 'butter chicken' }), toolCall('set_customer', { name: 'Uday' }), toolCall('read_back_order')),
+        toolsMsg(toolCall('confirm_and_submit_order')),
+        toolsMsg(toolCall('add_item', { item: 'garlic naan' }), toolCall('read_back_order')),
+        toolsMsg(toolCall('confirm_and_submit_order')),
+    ], { callerPhone: '5515550188' });
+    await engine.handleUtterance('butter chicken for Uday');
+    await engine.handleUtterance('yes');
+    await engine.handleUtterance('oh, add a garlic naan');
+    const second = await engine.handleUtterance('yes');
+    assert.match(second.say, /^Your order is placed, Uday/);
+    const rows = (await raw.query('select items from public.orders where call_sid = $1 order by created_at', [callId])).rows;
+    assert.equal(rows.length, 2);
+    assert.equal(rows[1].items[0].name, 'Garlic Naan');
+});
+
+test('tax: with a tax rate set, the readback and confirmation give the total with tax', async () => {
+    const { engine } = await newEngine([
+        toolsMsg(toolCall('add_item', { item: 'butter chicken' }), toolCall('set_customer', { name: 'Uday' }), toolCall('read_back_order')),
+        toolsMsg(toolCall('confirm_and_submit_order')),
+    ], { callerPhone: '5515550199', mutateJalwa: b => { b.tax_rate_percent = 6.625; } });
+    const rb = await engine.handleUtterance('butter chicken for Uday');
+    const done = await engine.handleUtterance('yes');
+    const subtotal = engine.workflows[0].order.data.subtotal;
+    const total = `$${(Math.round(subtotal * 106.625) / 100).toFixed(2)}`;
+    assert.ok(rb.say.includes(`Your total with tax is ${total}.`), rb.say);
+    assert.ok(done.say.includes(`Your total with tax is ${total}.`), done.say);
+});
+
+test('pickup errors include the earliest possible time; samosa means vegetable samosa', async () => {
+    const lateWednesday = () => new Date('2026-11-19T03:09:42Z');
+    const { engine } = await newEngine([
+        toolsMsg(toolCall('set_pickup_time', { day: 'today', time: '10:30 PM' })),
+        textMsg('The earliest is tomorrow at 11.'),
+    ], { clock: lateWednesday });
+    await engine.handleUtterance('pickup at 10:30 tonight');
+    const r = engine.messages.filter(m => m.role === 'tool').map(m => JSON.parse(m.content))[0];
+    assert.equal(r.ok, false);
+    assert.equal(r.earliest_possible, 'Thursday, Nov 19 at 11:00 AM');
+    assert.match(engine.systemPrompt('x'), /Earliest possible pickup: Thursday, Nov 19 at 11:00 AM/);
+    assert.equal(jalwaMenu.findItem('samosa').item.name, 'Vegetable Samosa');
+    assert.equal(jalwaMenu.findItem('samosa chaat').item.name, 'Samosa Chaat');
 });

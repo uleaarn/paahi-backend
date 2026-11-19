@@ -277,7 +277,12 @@
             }
           ],
           "modifiers": [],
-          "vegetarian": true
+          "vegetarian": true,
+          "aliases": [
+            "samosa",
+            "samosas",
+            "veg samosa"
+          ]
         },
         {
           "id": "vstart_lasuni_gobi",
