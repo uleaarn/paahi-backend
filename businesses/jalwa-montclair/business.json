@@ -57,5 +57,8 @@
     "notifications": {
         "email_to_env": "EMAIL_TO",
         "webhook_url_env": null
+    },
+    "pronunciations": {
+        "Jalwa": "Jahl-wah"
     }
 }

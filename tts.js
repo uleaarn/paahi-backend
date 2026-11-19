@@ -135,7 +135,18 @@ export class TextToSpeech {
      * Falls back to the next provider only if nothing has been played yet.
      * @returns {Promise<{ provider, voice, firstAudioMs, ms, bytes, fellBack, cached }>}
      */
+    /** Respell words the voice says wrong (business.json "pronunciations"), whole words only. */
+    applyPronunciations(text, business) {
+        let out = text;
+        for (const [word, spoken] of Object.entries(business?.pronunciations || {})) {
+            const re = new RegExp(`(?<![\\p{L}])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}])`, 'giu');
+            out = out.replace(re, spoken);
+        }
+        return out;
+    }
+
     async stream(text, { business, language }, onChunk) {
+        text = this.applyPronunciations(text, business);
         const errors = [];
         const voices = this.voicesFor(business, language).filter(v => this.available(v.provider));
         if (voices.length === 0) throw new Error(`no configured voice for language ${language}`);

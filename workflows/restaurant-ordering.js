@@ -18,7 +18,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { MenuService, checkPickupTime, nextOpening, zonedParts } from '../menu-service.js';
-import { OrderState, PHASES } from '../order-state.js';
+import { OrderState, PHASES, formatPhone } from '../order-state.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const INSTRUCTIONS = fs.readFileSync(path.join(__dirname, 'restaurant-ordering.md'), 'utf-8');
@@ -87,13 +87,13 @@ const TOOLS = [
     },
     {
         name: 'set_pickup_time',
-        description: 'Record when the caller will pick up. Use asap:true for as soon as possible (only while open), or date + time for a scheduled pickup. Convert what the caller said ("tomorrow at 7", "6:30 tonight") into the business local date and 24-hour time.',
+        description: 'Record when the caller will pick up. asap:true = as soon as possible (only while open). Otherwise give day and time exactly as the caller said them; the system works out the date.',
         parameters: {
             type: 'object',
             properties: {
                 asap: { type: 'boolean' },
-                date: { type: 'string', description: 'YYYY-MM-DD, business local date.' },
-                time: { type: 'string', description: 'HH:MM, 24-hour, business local time.' },
+                day: { type: 'string', description: '"today", "tomorrow", or a weekday name like "friday". Use YYYY-MM-DD only if the caller gave a date.' },
+                time: { type: 'string', description: 'Clock time, e.g. "11:30 AM" or "19:00".' },
             },
         },
         schedulingOnly: true,
@@ -157,6 +157,13 @@ export function prepare(config, { businessDir }) {
     };
 }
 
+/** What to do when the order only lacks a callback number. */
+function phoneHint(callerPhone) {
+    return callerPhone
+        ? `Caller ID is ${formatPhone(callerPhone)}. Ask if that number is OK for the order; on yes, call set_customer with it. If they want a different number and need a moment, wait. A missing number is never a reason to hand off or end the call.`
+        : 'Ask for a callback number. If they need a moment to find it, wait. A missing number is never a reason to hand off or end the call.';
+}
+
 export function createSession({ prepared, callId, clock, submitter, business, location }) {
     return new RestaurantOrderingSession({ prepared, callId, clock, submitter, business, location });
 }
@@ -197,7 +204,7 @@ class RestaurantOrderingSession {
         const today = zonedParts(this.clock(), this.timeZone);
         return [
             `Today is ${today.day} ${today.date} (business local time). Scheduled pickup: allowed up to ${this.scheduling.max_days_ahead} days ahead, during opening hours, at least ${this.scheduling.min_lead_minutes} minutes from now.`,
-            'If the caller wants it later or names a time, call set_pickup_time with date and time. While open and no time is given, pickup is as soon as possible.',
+            'If the caller wants it later or names a time, call set_pickup_time with day ("today", "tomorrow", a weekday) and time. Don\'t work out dates yourself. While open and no time is given, pickup is as soon as possible.',
         ].join('\n');
     }
 
@@ -233,6 +240,10 @@ class RestaurantOrderingSession {
         return this.order.data.customer.phone;
     }
 
+    missingFields() {
+        return this.order.missingFields();
+    }
+
     contactName() {
         return this.order.data.customer.name;
     }
@@ -264,14 +275,14 @@ class RestaurantOrderingSession {
         switch (name) {
             case 'set_pickup_time': {
                 if (!this.scheduling) return { forModel: { ok: false, error: 'scheduling_not_offered' } };
-                if (args.asap && !(args.date && args.time)) {
+                if (args.asap && !((args.day || args.date) && args.time)) {
                     if (closed) {
                         const next = this.nextOpeningLabel();
                         return { forModel: { ok: false, error: 'closed_now', message: `Closed now${next ? `; next opening ${next}` : ''}. Ask what time after opening they'd like to pick up.` } };
                     }
                     return { forModel: order.setPickupTime(null) };
                 }
-                const check = checkPickupTime(this.hours, { date: args.date, time: args.time }, {
+                const check = checkPickupTime(this.hours, { day: args.day, date: args.date, time: args.time }, {
                     now: this.clock(), timeZone: this.timeZone,
                     minLeadMinutes: this.scheduling.min_lead_minutes, maxDaysAhead: this.scheduling.max_days_ahead,
                 });
@@ -294,7 +305,10 @@ class RestaurantOrderingSession {
             }
             case 'read_back_order': {
                 const result = order.readBack(ctx.language);
-                if (!result.ok) return { forModel: result };
+                if (!result.ok) {
+                    if (result.missing?.includes('customer_phone')) result.hint = phoneHint(ctx.callerPhone);
+                    return { forModel: result };
+                }
                 this.readbackTurn = ctx.turn;
                 return {
                     forModel: { ok: true, note: 'Readback spoken to caller. Wait for their answer.' },
