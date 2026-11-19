@@ -442,6 +442,7 @@ class VoiceSession {
                 this.engine.event('turn_complete', { ms_to_reply_text: Date.now() - started });
                 console.log(`🤖 AGENT: "${reply.say}"`);
 
+                this.replyIsReadback = Boolean(reply.readback);
                 await this.synthesizeAndSend(reply.say);
                 if (reply.endCall) this.hangupWhenDone();
             }
@@ -486,6 +487,8 @@ class VoiceSession {
 
     async synthesizeAndSend(text) {
         const gen = ++this.replyGen;
+        this.replyAudioBytes = 0;      // how long this reply is (8 bytes = 1 ms)
+        this.replyPlayStartedAt = null; // when its first frame went out
         this.ttsStartTime = Date.now();
         this.streamingReply = true;
         this.audioCarry = Buffer.alloc(0);
@@ -540,6 +543,7 @@ class VoiceSession {
     // padded with silence (which would click). Only the very end is padded.
     enqueueMulaw(mulawAudio, { final = false } = {}) {
         const CHUNK_SIZE = 160;
+        this.replyAudioBytes = (this.replyAudioBytes || 0) + mulawAudio.length;
         let data = this.audioCarry.length ? Buffer.concat([this.audioCarry, mulawAudio]) : mulawAudio;
         const whole = data.length - (data.length % CHUNK_SIZE);
         for (let i = 0; i < whole; i += CHUNK_SIZE) this.outboundQueue.push(data.subarray(i, i + CHUNK_SIZE));
@@ -568,6 +572,7 @@ class VoiceSession {
         this.sendIntervals = [];
         this.lastFrameSendTime = Date.now();
 
+        if (!this.replyPlayStartedAt) this.replyPlayStartedAt = Date.now();
         this.playTimer = setInterval(() => {
             if (this.currentStreamAbort) {
                 console.log("🛑 Player aborted (barge-in). Clearing queue.");
@@ -611,6 +616,13 @@ class VoiceSession {
         // Never cut off the goodbye; the call is ending anyway.
         if (!(this.isPlaying || this.streamingReply) || this.hangupAfterPlayback) return;
         console.log('🛑 Caller interrupted: stopping playback');
+        if (this.replyIsReadback) {
+            // A readback only counts if the caller heard nearly all of it (the total comes last).
+            const totalMs = (this.replyAudioBytes || 0) / 8;
+            const playedMs = this.replyPlayStartedAt ? Date.now() - this.replyPlayStartedAt : 0;
+            if (this.streamingReply || !totalMs || playedMs < totalMs * 0.85) this.engine.readbackInterrupted();
+            this.replyIsReadback = false;
+        }
         this.replyGen += 1;          // drop audio of this reply that is still streaming in
         this.streamingReply = false;
         this.audioCarry = Buffer.alloc(0);

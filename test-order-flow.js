@@ -965,3 +965,60 @@ test('voice respells names the TTS says wrong, in speech only', () => {
         'Thank you for calling Jahl-wah. See you at Jahl-wah!');
     assert.equal(t.applyPronunciations('Jalwas', { pronunciations: { Jalwa: 'Jahl-wah' } }), 'Jalwas', 'whole words only');
 });
+
+test('side request during an order: staff get a note, the order stays open and can still be placed', async () => {
+    const { engine, order, callId } = await newEngine([
+        toolsMsg(toolCall('add_item', { item: 'butter chicken' }), toolCall('set_customer', { name: 'Uday', phone: '551 555 0101' }), toolCall('read_back_order')),
+        toolsMsg(toolCall('request_human', { reason: 'Caller asks to cancel an earlier order' })),
+        textMsg("I can't change other orders, but I've asked the team to call you about it. Shall I place this one?"),
+        toolsMsg(toolCall('read_back_order')),
+        toolsMsg(toolCall('confirm_and_submit_order')),
+    ]);
+    await engine.handleUtterance('one butter chicken, Uday, 551 555 0101');
+    const r = await engine.handleUtterance('also cancel my 11:30 order from before');
+    assert.equal(r.endCall, false, 'call continues');
+    assert.equal(engine.handoff, null);
+    assert.ok(engine.events.some(e => e.type === 'staff_note' && e.sent));
+    assert.notEqual(order.phase, PHASES.HANDOFF);
+    const notes = (await raw.query('select reason from public.callback_requests where call_sid = $1', [callId])).rows;
+    assert.equal(notes.length, 1);
+    await engine.handleUtterance('yes, place it');
+    const done = await engine.handleUtterance('yes, correct');
+    assert.equal(done.endCall, true);
+    assert.equal(order.phase, PHASES.SUBMITTED);
+    assert.equal((await raw.query('select count(*)::int as n from public.orders where call_sid = $1', [callId])).rows[0].n, 1);
+});
+
+test('asking for a person twice during an order is a real handoff', async () => {
+    const { engine, order } = await newEngine([
+        toolsMsg(toolCall('add_item', { item: 'butter chicken' }), toolCall('set_customer', { name: 'Uday', phone: '551 555 0101' })),
+        textMsg('Anything else?'),
+        toolsMsg(toolCall('request_human', { reason: 'wants a manager' })),
+        textMsg('I have sent a note to the team. Shall we finish the order?'),
+        toolsMsg(toolCall('request_human', { reason: 'insists on a manager now' })),
+    ]);
+    await engine.handleUtterance('butter chicken for Uday 551 555 0101');
+    assert.equal((await engine.handleUtterance('get me a manager')).endCall, false);
+    const r = await engine.handleUtterance('no, I want a manager now');
+    assert.equal(r.endCall, true);
+    assert.equal(order.phase, PHASES.HANDOFF);
+});
+
+test('a readback the caller talked over must be read again before confirming', async () => {
+    const { engine, order } = await newEngine([
+        toolsMsg(toolCall('add_item', { item: 'butter chicken' }), toolCall('set_customer', { name: 'Uday', phone: '551 555 0101' }), toolCall('read_back_order')),
+        toolsMsg(toolCall('confirm_and_submit_order')),
+        toolsMsg(toolCall('read_back_order')),
+        toolsMsg(toolCall('confirm_and_submit_order')),
+    ]);
+    const rb = await engine.handleUtterance('butter chicken for Uday 551 555 0101');
+    assert.equal(rb.readback, true, 'voice server is told this reply is a readback');
+    engine.readbackInterrupted(); // the voice server calls this on barge-in before most of it played
+    assert.ok(engine.events.some(e => e.type === 'readback_interrupted'));
+    const again = await engine.handleUtterance('yes');
+    assert.ok(engine.events.some(e => e.type === 'tool' && e.error === 'readback_was_interrupted'));
+    assert.match(again.say, /^Let me read that back/);
+    const done = await engine.handleUtterance('yes, that is right');
+    assert.equal(done.endCall, true);
+    assert.equal(order.phase, PHASES.SUBMITTED);
+});

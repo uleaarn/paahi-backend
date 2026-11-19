@@ -244,6 +244,17 @@ class RestaurantOrderingSession {
         return this.order.missingFields();
     }
 
+    /** Readback cut off by the caller: it has to be read again before confirming. */
+    onReadbackInterrupted() {
+        if (this.order.phase !== PHASES.AWAITING_CONFIRMATION) return false;
+        this.order.data.status = PHASES.COLLECTING;
+        this.order.data.confirmation_status = 'not_confirmed';
+        this.order.readbackVersion = null;
+        this.order.readbackInterrupted = true;
+        this.readbackTurn = null;
+        return true;
+    }
+
     contactName() {
         return this.order.data.customer.name;
     }
@@ -312,12 +323,15 @@ class RestaurantOrderingSession {
                 this.readbackTurn = ctx.turn;
                 return {
                     forModel: { ok: true, note: 'Readback spoken to caller. Wait for their answer.' },
-                    outcome: { say: result.say_exactly, endCall: false, handoff: false },
+                    outcome: { say: result.say_exactly, endCall: false, handoff: false, readback: true },
                 };
             }
             case 'confirm_and_submit_order': {
                 // The caller must have heard the readback on an earlier turn.
                 if (this.readbackTurn === null || this.readbackTurn >= ctx.turn) {
+                    if (order.readbackInterrupted) {
+                        return { forModel: { ok: false, error: 'readback_was_interrupted', message: 'The caller talked over the readback, so they did not hear all of it (including the total). Call read_back_order again.' } };
+                    }
                     return { forModel: { ok: false, error: 'caller_has_not_heard_readback', message: 'Call read_back_order and wait for the caller to answer.' } };
                 }
                 const confirmed = order.confirm({ callerUtterance: ctx.lastUserUtterance, language: ctx.language });
