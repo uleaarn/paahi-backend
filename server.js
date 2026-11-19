@@ -653,6 +653,12 @@ class VoiceSession {
         if (this.playTimer) clearInterval(this.playTimer);
         if (this.hangupTimer) clearTimeout(this.hangupTimer);
 
+        // Order still open when the caller hung up: tell staff before the record is closed.
+        try {
+            await this.engine.alertIfOrderUnfinished();
+        } catch (e) {
+            console.error('❌ Unfinished-order alert failed:', e.message);
+        }
         for (const w of this.engine.workflows) w.onEnd?.();
         const state = this.engine.callState();
         const order = state.workflows.restaurant_ordering || null;

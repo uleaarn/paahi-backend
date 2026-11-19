@@ -1210,3 +1210,42 @@ test('pickup errors include the earliest possible time; samosa means vegetable s
     assert.equal(jalwaMenu.findItem('samosa').item.name, 'Vegetable Samosa');
     assert.equal(jalwaMenu.findItem('samosa chaat').item.name, 'Samosa Chaat');
 });
+
+// ------------------------------------------------------------ unfinished orders
+
+test('caller hangs up mid-order: staff get one UNFINISHED ORDER alert with the items and number', async () => {
+    const { engine, emails, actions, callId } = await newEngine([
+        toolsMsg(toolCall('add_item', { item: 'butter chicken', spice_level: 'mild' }), toolCall('set_customer', { name: 'Uday' })),
+        textMsg('Got it. Anything else?'),
+    ], { callerPhone: '5515550210' });
+    await engine.handleUtterance('one mild butter chicken for Uday');
+    // The phone server calls this when the line closes.
+    assert.equal(await engine.alertIfOrderUnfinished(), true);
+    assert.equal(await engine.alertIfOrderUnfinished(), true, 'a repeat is a no-op duplicate, not a second alert');
+    const rows = (await raw.query('select reason, customer_phone from public.callback_requests where call_sid = $1', [callId])).rows;
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].reason, 'Hung up before finishing the order');
+    assert.equal(rows[0].customer_phone, '5515550210');
+    await actions.lastDelivery;
+    const alert = emails.find(e => e.msg.type === 'callback_request');
+    assert.ok(alert);
+    assert.equal(ticketSubject(alert.msg), 'UNFINISHED ORDER: call back Uday (551) 555-0210');
+    const html = ticketHtml(alert.msg);
+    assert.match(html, /In their unfinished order:<\/b> 1 x Butter Chicken \(mild spice\)/);
+    assert.match(html, /hung up before confirming/);
+});
+
+test('no unfinished-order alert after the order is placed, or when there is nothing in it', async () => {
+    const { engine, callId } = await newEngine([
+        toolsMsg(toolCall('add_item', { item: 'butter chicken' }), toolCall('set_customer', { name: 'Uday' }), toolCall('read_back_order')),
+        toolsMsg(toolCall('confirm_and_submit_order')),
+    ], { callerPhone: '5515550211' });
+    await engine.handleUtterance('butter chicken for Uday');
+    await engine.handleUtterance('yes');
+    assert.equal(await engine.alertIfOrderUnfinished(), false);
+    const empty = await newEngine([textMsg('Hi! What can I get you?')], { callerPhone: '5515550212' });
+    await empty.engine.handleUtterance('hello');
+    assert.equal(await empty.engine.alertIfOrderUnfinished(), false);
+    const rows = (await raw.query('select count(*)::int as n from public.callback_requests where call_sid = $1', [callId])).rows;
+    assert.equal(rows[0].n, 0);
+});

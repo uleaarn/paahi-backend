@@ -19,6 +19,7 @@ import { openStatus, nextOpening } from './menu-service.js';
 import { formatPhone, speakPhone, normalizePhone } from './order-state.js';
 
 const MAX_TOOL_ROUNDS = 5;
+export const UNFINISHED_ORDER_REASON = 'Hung up before finishing the order';
 const MAX_HISTORY_MESSAGES = 40;
 const ALLERGY_PATTERN = /(?<![\p{L}\p{M}])(allerg\w*|anaphyla\w*|celiac|coeliac|epipen|peanuts?|tree nuts?|nuts?|gluten|dairy|lactose|shellfish|sesame|alergia|alérgico|alérgica|allergie|एलर्जी|అలర్జీ)(?![\p{L}\p{M}])/iu;
 
@@ -352,6 +353,33 @@ export class ConversationEngine {
             locationId: this.location.id,
         });
         this.event('staff_note', { reason, sent: Boolean(r?.success) });
+        return Boolean(r?.success);
+    }
+
+    /**
+     * The caller hung up with an order still open (items, not placed). Staff get an
+     * "unfinished order" alert with the items and number, so they can call back.
+     */
+    async alertIfOrderUnfinished() {
+        if (this.handoff) return false; // staff already have a callback request
+        const w = this.workflows.find(x => x.hasUnfinishedWork());
+        if (!w) return false;
+        const phone = this.contactPhone();
+        if (!phone || !this.business.escalation.callbackEnabled || !this.submitter?.notifyCallback) {
+            this.event('unfinished_order_not_alerted', { reason: phone ? 'callbacks_off' : 'no_number' });
+            return false;
+        }
+        const r = await this.submitter.notifyCallback({
+            call_id: this.callId,
+            phone,
+            name: w.contactName?.() || null,
+            reason: UNFINISHED_ORDER_REASON,
+            language: this.language,
+            order: w.snapshot(),
+            locationId: this.location.id,
+            kind: 'unfinished_order',
+        });
+        this.event('unfinished_order_alert', { sent: Boolean(r?.success) });
         return Boolean(r?.success);
     }
 

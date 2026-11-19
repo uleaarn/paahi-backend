@@ -153,12 +153,12 @@ export class BusinessActions {
     }
 
     /** Save a staff callback request. Success means it is in the database. */
-    async notifyCallback({ call_id, phone, name, reason, language = null, order = null, locationId = null }) {
+    async notifyCallback({ call_id, phone, name, reason, language = null, order = null, locationId = null, kind = 'callback' }) {
         const channels = this.channels();
         let result;
         try {
             result = await this.db.forBusiness(this.business.id, async tx => {
-                const key = `paahi:${call_id}:callback`;
+                const key = `paahi:${call_id}:${kind}`; // one of each kind per call
                 const inserted = await tx.query(
                     `insert into public.callback_requests
                         (business_id, location_id, call_sid, idempotency_key, customer_phone, customer_name, reason, language, order_snapshot)
@@ -288,7 +288,8 @@ export function callbackMessage(business, c) {
         placed_text: placedText(business, c.created_at),
         reason: c.reason,
         language: c.language || 'en',
-        mentioned_items: snap?.items?.length ? snap.items.map(l => `${l.quantity} x ${l.name}`) : [],
+        mentioned_items: snap?.items?.length ? snap.items.map(l => itemsText([l])) : [],
+        wanted_pickup: snap?.requested_time ? pickupText(business, snap.requested_time) : null,
         items: 'CALLBACK REQUEST — no order placed',
         order_summary: `Please call this customer back${c.language && c.language !== 'en' ? ` (caller's language: ${c.language})` : ''}. Reason: ${c.reason}.` +
             (snap?.items?.length ? ` Unsubmitted items they mentioned: ${snap.items.map(l => `${l.quantity} x ${l.name}`).join(', ')}.` : ''),
