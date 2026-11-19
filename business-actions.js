@@ -212,7 +212,7 @@ function itemsText(items) {
     return items.map(l => {
         const extras = [
             l.size && l.size !== 'regular' ? l.size : null,
-            l.spice_level ? `${l.spice_level.replace('_', ' ')} spice` : null,
+            l.spice_level ? (l.spice_level === 'medium' ? 'medium spice' : l.spice_level.replace('_', ' ')) : null,
             ...(l.modifiers || []).map(m => m.name),
             l.special_instructions,
             l.allergy_notes ? `ALLERGY: ${l.allergy_notes}` : null,
@@ -283,7 +283,7 @@ export function callbackMessage(business, c) {
         source: 'voice_call',
         session_id: c.call_sid,
         timestamp: new Date(c.created_at).toISOString(),
-        customer_name: c.customer_name || 'Unknown caller',
+        customer_name: c.customer_name || null, // no name given yet: tickets show just the number
         customer_phone: formatPhone(c.customer_phone),
         placed_text: placedText(business, c.created_at),
         reason: c.reason,

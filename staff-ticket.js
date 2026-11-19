@@ -42,8 +42,9 @@ export function ticketSubject(m) {
         const when = m.pickup_time && m.pickup_time !== 'ASAP' ? ` for ${m.pickup_time}` : '';
         return `CANCELLED order ${shortId(m.order_id)}: ${m.customer_name || 'Customer'}${when}. Do not prepare`;
     }
-    if (m.type === 'callback_request' && isUnfinished(m)) return `UNFINISHED ORDER: call back ${m.customer_name || 'caller'} ${m.customer_phone || ''}`.trim();
-    if (m.type === 'callback_request') return `CALL BACK: ${m.customer_name || 'Caller'} ${m.customer_phone || ''}`.trim();
+    const who = [m.customer_name, m.customer_phone].filter(Boolean).join(' ') || 'caller (no number)';
+    if (m.type === 'callback_request' && isUnfinished(m)) return `UNFINISHED ORDER: call back ${who}`;
+    if (m.type === 'callback_request') return `CALL BACK: ${who}`;
     const when = m.pickup_time && m.pickup_time !== 'ASAP' ? `SCHEDULED ${m.pickup_time}` : 'ASAP';
     const type = m.order_type === 'delivery' ? 'Delivery' : 'Pickup';
     const id = shortId(m.order_id);
@@ -122,7 +123,7 @@ function callbackHtml(m) {
     const mentioned = (m.mentioned_items || []).map(escapeHtml).join(', ');
     return page(ticketSubject(m), [
         header(`${escapeHtml(m.business_name || '')} · ${isUnfinished(m) ? 'UNFINISHED ORDER' : 'CALL BACK'}`, escapeHtml(m.placed_text || '')),
-        box('Call:', `${escapeHtml(m.customer_name || 'Caller')} &nbsp; ${escapeHtml(m.customer_phone || 'no number given')}`, { big: true }),
+        box('Call:', `${m.customer_name ? `${escapeHtml(m.customer_name)} &nbsp; ` : ''}${escapeHtml(m.customer_phone || 'no number given')}${m.customer_name ? '' : ' &nbsp;(no name given)'}`, { big: true }),
         `<div style="margin:4px 0;"><b>Reason:</b> ${escapeHtml(m.reason || 'Not given')}</div>`,
         m.wanted_pickup ? `<div style="margin:4px 0;"><b>Wanted pickup:</b> ${escapeHtml(m.wanted_pickup)}</div>` : '',
         mentioned ? `<div style="margin:4px 0;"><b>${isUnfinished(m) ? 'In their unfinished order' : 'Not ordered yet, mentioned'}:</b> ${mentioned}</div>` : '',
@@ -140,7 +141,7 @@ export function ticketHtml(m) {
 export function ticketText(m) {
     const out = [];
     if (m.type === 'callback_request') {
-        out.push(`${m.business_name || ''} - CALL BACK`, `Call: ${m.customer_name || 'Caller'}  ${m.customer_phone || 'no number given'}`,
+        out.push(`${m.business_name || ''} - CALL BACK`, `Call: ${[m.customer_name, m.customer_phone || 'no number given'].filter(Boolean).join('  ')}${m.customer_name ? '' : ' (no name given)'}`,
             `Reason: ${m.reason || 'Not given'}`);
         if (m.mentioned_items?.length) out.push(`Not ordered yet, mentioned: ${m.mentioned_items.join(', ')}`);
         if (m.language && m.language !== 'en') out.push(`Caller spoke: ${LANGUAGE_NAMES[m.language] || m.language}`);
