@@ -88,7 +88,7 @@ test('modifiers and spice must be allowed for that item', () => {
     assert.equal(order.data.items[0].spice_level, 'mild');
     // Spice sent as a modifier is routed to spice_level
     order.addItem({ item: 'chicken vindaloo', modifiers: ['extra spicy'] });
-    assert.equal(order.data.items[1].spice_level, 'extra_spicy');
+    assert.equal(order.data.items[1].spice_level, 'spicy');
     assert.equal(order.data.items[1].modifiers.length, 0);
 });
 
@@ -364,12 +364,25 @@ const JALWA_NUMBER = '+19735550100';   // test-only numbers
 const HARBOR_NUMBER = '+12015550199';
 
 /** A throwaway businesses/ folder: the real Jalwa config plus a second, unrelated business. */
+// Fixed hours for tests, so live changes to Jalwa's business.json don't break them.
+const FIXTURE_HOURS = {
+    monday: '11:00 AM - 3:00 PM, 5:00 PM - 10:30 PM',
+    tuesday: '11:00 AM - 3:00 PM, 5:00 PM - 10:30 PM',
+    wednesday: '11:00 AM - 3:00 PM, 5:00 PM - 10:30 PM',
+    thursday: '11:00 AM - 3:00 PM, 5:00 PM - 10:30 PM',
+    friday: '11:00 AM - 3:00 PM, 5:00 PM - 11:00 PM',
+    saturday: '11:00 AM - 3:00 PM, 5:00 PM - 11:00 PM',
+    sunday: '11:00 AM - 3:00 PM, 5:00 PM - 9:30 PM',
+};
+
 function makeFixtureRoot({ mutateJalwa, extra } = {}) {
     const root = tmpDir();
     const jalwaDir = path.join(root, 'jalwa-montclair');
     fs.mkdirSync(jalwaDir);
     const jalwa = JSON.parse(fs.readFileSync(path.join(__dirname, 'businesses', 'jalwa-montclair', 'business.json'), 'utf-8'));
     jalwa.phone_numbers = [JALWA_NUMBER];
+    jalwa.locations[0].hours = FIXTURE_HOURS;
+    delete jalwa.tax_rate_percent; // tests that need tax set it themselves
     if (mutateJalwa) mutateJalwa(jalwa);
     fs.writeFileSync(path.join(jalwaDir, 'business.json'), JSON.stringify(jalwa));
     fs.copyFileSync(path.join(__dirname, 'test-fixtures', 'sample-menu.json'), path.join(jalwaDir, 'menu.json'));
@@ -621,7 +634,7 @@ test('business closed, scheduled orders on: order is taken for a pickup time aft
 });
 
 test('scheduled pickup times are checked against hours, lead time and how far ahead', () => {
-    const hours = JSON.parse(fs.readFileSync(path.join(__dirname, 'businesses', 'jalwa-montclair', 'business.json'), 'utf-8')).locations[0].hours;
+    const hours = FIXTURE_HOURS;
     const opts = { now: CLOSED_TIME(), timeZone: 'America/New_York', minLeadMinutes: 20, maxDaysAhead: 7 };
     assert.equal(checkPickupTime(hours, { date: '2026-11-17', time: '19:00' }, opts).ok, true);
     assert.equal(checkPickupTime(hours, { date: '2026-11-18', time: '12:00' }, opts).ok, true, 'tomorrow lunch');
@@ -655,18 +668,38 @@ test('Jalwa menu: dish names are found however the caller says them', () => {
     assert.equal(starter.base_price, 14);
 });
 
-test('Jalwa menu: lunch specials only for Mon-Thu lunch, including scheduled pickups', () => {
+test('Jalwa menu: lunch special needs its choices, and is only for Mon-Thu lunch', () => {
     const at = iso => () => new Date(iso);
     const tueLunch = new OrderState({ callId: 'CA_l1', menu: jalwaMenu, clock: at('2026-11-17T17:00:00Z') }); // Tue 12:00
-    assert.equal(tueLunch.addItem({ item: 'palak paneer lunch special' }).ok, true);
+    const missing = tueLunch.addItem({ item: 'lunch special', modifiers: ['vegetable samosa'] });
+    assert.equal(missing.error, 'choice_required');
+    assert.equal(missing.choose, 'entree');
+    assert.ok(missing.options.includes('Chicken Makhani (+$1)'));
+    const ok = tueLunch.addItem({ item: 'lunch special', modifiers: ['veg samosa', 'chicken makhani', 'garlic nan'] });
+    assert.equal(ok.ok, true);
+    assert.equal(tueLunch.data.subtotal, 18, '$16 + $1 entree + $1 bread');
+    assert.equal(tueLunch.addItem({ item: 'lunch special', modifiers: ['samosa', 'palak paneer', 'butter naan', 'garlic naan'] }).error, 'too_many_choices');
     // Moving that order to Friday evening is refused while it holds a lunch special.
-    const r = tueLunch.setPickupTime(new Date('2026-11-20T23:00:00Z'));
-    assert.equal(r.error, 'items_not_available_at_that_time');
+    assert.equal(tueLunch.setPickupTime(new Date('2026-11-20T23:00:00Z')).error, 'items_not_available_at_that_time');
     const saturday = new OrderState({ callId: 'CA_l2', menu: jalwaMenu, clock: at('2026-11-21T17:00:00Z') });
-    const sat = saturday.addItem({ item: 'palak paneer lunch special' });
+    const sat = saturday.addItem({ item: 'lunch special', modifiers: ['samosa', 'palak paneer', 'butter naan'] });
     assert.equal(sat.error, 'not_available_at_that_time');
-    assert.match(sat.available, /monday, tuesday, wednesday, thursday 11:30 AM - 3:00 PM/);
-    assert.equal(saturday.addItem({ item: 'palak paneer' }).ok, true);
+    assert.match(sat.available, /Mon-Thu 11:30 AM - 3:00 PM; Fri-Sun not available/);
+    assert.equal(saturday.addItem({ item: 'palak paneer', spice_level: 'mild' }).ok, true);
+});
+
+test('Jalwa menu: spice only where the kitchen can adjust it; switched-off dishes are refused', () => {
+    const order = new OrderState({ callId: 'CA_s1', menu: jalwaMenu, clock: () => new Date('2026-11-19T17:00:00Z') });
+    const ask = order.addItem({ item: 'chicken tikka masala' });
+    assert.equal(ask.error, 'spice_required');
+    assert.deepEqual(ask.options, ['mild', 'medium', 'spicy']);
+    assert.equal(order.addItem({ item: 'chicken tikka masala', spice_level: 'not too spicy', modifiers: ['white meat'] }).ok, true);
+    assert.equal(order.data.items[0].spice_level, 'mild');
+    assert.equal(order.data.items[0].line_total, 27, '$25 + $2 white meat');
+    const naan = order.addItem({ item: 'garlic naan', spice_level: 'spicy' });
+    assert.equal(naan.error, 'spice_not_adjustable');
+    assert.match(naan.message, /can't change the spice level/);
+    assert.equal(order.addItem({ item: 'palak chaat' }).error, 'item_unavailable');
 });
 
 test('allergy mention adds a safety note to the model prompt', async () => {
@@ -952,7 +985,7 @@ test('missing callback number: Paahi offers Caller ID and keeps the call going i
 });
 
 test('pickup day words are resolved by code, late at night too', () => {
-    const hours = JSON.parse(fs.readFileSync(path.join(__dirname, 'businesses', 'jalwa-montclair', 'business.json'), 'utf-8')).locations[0].hours;
+    const hours = FIXTURE_HOURS;
     const lateWednesday = new Date('2026-11-19T03:09:42Z'); // 10:09 PM Wednesday in New York
     const opts = { now: lateWednesday, timeZone: 'America/New_York' };
     const tomorrow = checkPickupTime(hours, { day: 'tomorrow', time: '11:30 AM' }, opts);
@@ -1159,8 +1192,8 @@ test('tax: with a tax rate set, the readback and confirmation give the total wit
     const done = await engine.handleUtterance('yes');
     const subtotal = engine.workflows[0].order.data.subtotal;
     const total = `$${(Math.round(subtotal * 106.625) / 100).toFixed(2)}`;
-    assert.ok(rb.say.includes(`Your total with tax is ${total}.`), rb.say);
-    assert.ok(done.say.includes(`Your total with tax is ${total}.`), done.say);
+    assert.ok(rb.say.includes(`Your estimated total with tax is ${total}.`), rb.say);
+    assert.ok(done.say.includes(`Your estimated total with tax is ${total}.`), done.say);
 });
 
 test('pickup errors include the earliest possible time; samosa means vegetable samosa', async () => {

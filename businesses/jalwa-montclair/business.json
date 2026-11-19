@@ -12,13 +12,13 @@
             "address": "215 Glenridge Ave, Montclair, NJ 07042",
             "phone": "(973) 250-6364",
             "hours": {
-                "monday": "11:00 AM - 3:00 PM, 5:00 PM - 10:30 PM",
-                "tuesday": "11:00 AM - 3:00 PM, 5:00 PM - 10:30 PM",
-                "wednesday": "11:00 AM - 3:00 PM, 5:00 PM - 10:30 PM",
-                "thursday": "11:00 AM - 3:00 PM, 5:00 PM - 10:30 PM",
-                "friday": "11:00 AM - 3:00 PM, 5:00 PM - 11:00 PM",
-                "saturday": "11:00 AM - 3:00 PM, 5:00 PM - 11:00 PM",
-                "sunday": "11:00 AM - 3:00 PM, 5:00 PM - 9:30 PM"
+                "monday": "9:00 AM - 3:00 PM, 4:30 PM - 10:15 PM",
+                "tuesday": "9:00 AM - 3:00 PM, 4:30 PM - 10:15 PM",
+                "wednesday": "9:00 AM - 3:00 PM, 4:30 PM - 10:15 PM",
+                "thursday": "9:00 AM - 3:00 PM, 4:30 PM - 10:15 PM",
+                "friday": "9:00 AM - 3:00 PM, 4:30 PM - 10:30 PM",
+                "saturday": "9:00 AM - 3:00 PM, 4:30 PM - 10:30 PM",
+                "sunday": "9:00 AM - 3:00 PM, 4:30 PM - 9:30 PM"
             }
         }
     ],
@@ -60,5 +60,6 @@
     },
     "pronunciations": {
         "Jalwa": "Jahl-wah"
-    }
+    },
+    "tax_rate_percent": 6.625
 }

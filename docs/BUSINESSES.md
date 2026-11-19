@@ -50,6 +50,8 @@ The server loads every folder at startup and **refuses to start** if any config 
 - **Tax** (`"tax_rate_percent": 6.625` at the top level): when set, the readback, the order-placed line and the staff ticket give the total with tax. Unset, Paahi says the subtotal "before tax". Jalwa's isn't set until the restaurant confirms its rate.
 - **Pronunciations** (`"pronunciations": { "Jalwa": "Jahl-wah" }`): respellings used only for the voice.
 - **Existing orders**: callers can look up and cancel their own phone orders by callback number (Caller ID, or another number plus the name on the order). Cancelling sets `orders.status = 'cancelled'` and emails staff a "CANCELLED, do not prepare" ticket.
+- **Importing a menu from the restaurant's ordering system**: `node scripts/import-menu-export.js <export.json> businesses/<id> --hours` rebuilds `menu.json` from the export (items, prices, option groups such as the lunch special's starter/entree/bread, spice choices, items switched off, per-menu service hours) and, with `--hours`, the location hours. Extra spoken names live in `businesses/<id>/menu-aliases.json` and survive re-imports. Jalwa's menu was imported from its export on 2026-11-19.
+- **Spice**: a dish gets mild/medium/spicy only if the ordering system has a Spice group for it; Paahi asks when the caller doesn't say, and says plainly when a dish can't be changed.
 - **Delivery** stays off until `order_types` includes `"delivery"` **and** a `delivery` rules block exists. The server rejects delivery without rules. The rules (area, fee, minimum) aren't designed yet.
 - **FAQs** are the only free-form facts the agent may state. Leave the list empty rather than guess.
 

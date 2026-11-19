@@ -29,7 +29,7 @@ function itemDetails(line) {
     const details = [];
     if (line.size && line.size !== 'regular') details.push({ text: `Size: ${line.size}` });
     for (const m of line.modifiers || []) details.push({ text: `+ ${m.name}${m.price ? ` (${money(m.price)})` : ''}` });
-    if (line.spice_level && line.spice_level !== 'regular') details.push({ text: `Spice: ${line.spice_level.replace('_', ' ')}` });
+    if (line.spice_level) details.push({ text: `Spice: ${line.spice_level.replace('_', ' ')}`, alert: line.spice_level !== 'medium' });
     if (line.special_instructions) details.push({ text: `Note: ${line.special_instructions}` });
     if (line.allergy_notes) details.push({ text: `ALLERGY: ${line.allergy_notes}`, alert: true });
     return details;
@@ -108,7 +108,7 @@ function orderHtml(m) {
 <tr style="border-bottom:1px solid #000;"><th style="${CELL}text-align:left;">Qty</th><th style="${CELL}text-align:left;">Item</th><th style="${CELL}text-align:right;">Total</th></tr>
 ${rows || `<tr><td colspan="3" style="${CELL}">${escapeHtml(m.items || '')}</td></tr>`}
 <tr><td colspan="2" style="${CELL}${RULE}text-align:right;"><b>Subtotal</b> (before tax)</td><td style="${CELL}${RULE}text-align:right;"><b>${money(m.subtotal)}</b></td></tr>
-${m.tax_rate_percent ? `<tr><td colspan="2" style="${CELL}text-align:right;">Total with ${m.tax_rate_percent}% tax</td><td style="${CELL}text-align:right;">${money(withTax(m.subtotal, m.tax_rate_percent))}</td></tr>` : ''}
+${m.tax_rate_percent ? `<tr><td colspan="2" style="${CELL}text-align:right;">Est. total with ${m.tax_rate_percent}% tax (POS has final)</td><td style="${CELL}text-align:right;">${money(withTax(m.subtotal, m.tax_rate_percent))}</td></tr>` : ''}
 </table>`,
         extras,
         footer(m),

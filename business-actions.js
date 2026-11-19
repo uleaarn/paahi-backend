@@ -212,7 +212,7 @@ function itemsText(items) {
     return items.map(l => {
         const extras = [
             l.size && l.size !== 'regular' ? l.size : null,
-            l.spice_level && l.spice_level !== 'regular' ? l.spice_level.replace('_', ' ') : null,
+            l.spice_level ? `${l.spice_level.replace('_', ' ')} spice` : null,
             ...(l.modifiers || []).map(m => m.name),
             l.special_instructions,
             l.allergy_notes ? `ALLERGY: ${l.allergy_notes}` : null,

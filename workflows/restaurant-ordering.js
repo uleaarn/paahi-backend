@@ -38,8 +38,8 @@ const SCHEDULE_DEFAULTS = { min_lead_minutes: 20, max_days_ahead: 7 };
 const itemOptionProps = {
     quantity: { type: 'integer', minimum: 1, description: 'How many. Default 1.' },
     size: { type: 'string', description: 'Size name if the item has sizes (e.g. half, full, large).' },
-    modifiers: { type: 'array', items: { type: 'string' }, description: 'Changes like "no onion", "extra garlic", "butter".' },
-    spice_level: { type: 'string', enum: ['mild', 'regular', 'extra_spicy'], description: 'Only if the caller asked.' },
+    modifiers: { type: 'array', items: { type: 'string' }, description: 'Choices and add-ons by name, e.g. the lunch special\'s starter, entree and bread, or "white meat".' },
+    spice_level: { type: 'string', enum: ['mild', 'medium', 'spicy'], description: 'For dishes marked "spice": ask mild, medium or spicy if the caller didn\'t say.' },
     special_instructions: { type: 'string', description: 'Short kitchen note for this item.' },
     allergy_notes: { type: 'string', description: 'Allergy the caller mentioned for this item.' },
 };
