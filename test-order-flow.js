@@ -1231,7 +1231,7 @@ test('caller hangs up mid-order: staff get one UNFINISHED ORDER alert with the i
     assert.ok(alert);
     assert.equal(ticketSubject(alert.msg), 'UNFINISHED ORDER: call back Uday (551) 555-0210');
     const html = ticketHtml(alert.msg);
-    assert.match(html, /In their unfinished order:<\/b> 1 x Butter Chicken \(mild spice\)/);
+    assert.match(html, /In their unfinished order:<\/b> 1 x Butter Chicken \(mild\)/);
     assert.match(html, /hung up before confirming/);
 });
 
@@ -1248,4 +1248,20 @@ test('no unfinished-order alert after the order is placed, or when there is noth
     assert.equal(await empty.engine.alertIfOrderUnfinished(), false);
     const rows = (await raw.query('select count(*)::int as n from public.callback_requests where call_sid = $1', [callId])).rows;
     assert.equal(rows[0].n, 0);
+});
+
+test('unfinished-order alert without a name shows just the number, and spice reads naturally', async () => {
+    const { engine, emails, actions } = await newEngine([
+        toolsMsg(toolCall('add_item', { item: 'chicken vindaloo', modifiers: ['extra spicy'] })),
+        textMsg('Got it. Can I get a name?'),
+    ], { callerPhone: '5513448600' });
+    await engine.handleUtterance('one chicken vindaloo, extra spicy');
+    await engine.alertIfOrderUnfinished();
+    await actions.lastDelivery;
+    const alert = emails.find(e => e.msg.type === 'callback_request');
+    assert.equal(ticketSubject(alert.msg), 'UNFINISHED ORDER: call back (551) 344-8600');
+    const html = ticketHtml(alert.msg);
+    assert.match(html, /\(551\) 344-8600 &nbsp;\(no name given\)/);
+    assert.doesNotMatch(html, /Unknown caller|spicy spice/);
+    assert.match(html, /1 x Chicken Vindaloo \(spicy\)/);
 });
