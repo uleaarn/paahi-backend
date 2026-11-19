@@ -10,6 +10,8 @@
  * business-actions.js.
  */
 
+const isUnfinished = m => /^Hung up before finishing the order/.test(m.reason || '');
+
 const LANGUAGE_NAMES = { en: 'English', es: 'Spanish', fr: 'French', hi: 'Hindi', te: 'Telugu' };
 
 export function escapeHtml(value) {
@@ -40,6 +42,7 @@ export function ticketSubject(m) {
         const when = m.pickup_time && m.pickup_time !== 'ASAP' ? ` for ${m.pickup_time}` : '';
         return `CANCELLED order ${shortId(m.order_id)}: ${m.customer_name || 'Customer'}${when}. Do not prepare`;
     }
+    if (m.type === 'callback_request' && isUnfinished(m)) return `UNFINISHED ORDER: call back ${m.customer_name || 'caller'} ${m.customer_phone || ''}`.trim();
     if (m.type === 'callback_request') return `CALL BACK: ${m.customer_name || 'Caller'} ${m.customer_phone || ''}`.trim();
     const when = m.pickup_time && m.pickup_time !== 'ASAP' ? `SCHEDULED ${m.pickup_time}` : 'ASAP';
     const type = m.order_type === 'delivery' ? 'Delivery' : 'Pickup';
@@ -118,12 +121,13 @@ ${m.tax_rate_percent ? `<tr><td colspan="2" style="${CELL}text-align:right;">Est
 function callbackHtml(m) {
     const mentioned = (m.mentioned_items || []).map(escapeHtml).join(', ');
     return page(ticketSubject(m), [
-        header(`${escapeHtml(m.business_name || '')} · CALL BACK`, escapeHtml(m.placed_text || '')),
+        header(`${escapeHtml(m.business_name || '')} · ${isUnfinished(m) ? 'UNFINISHED ORDER' : 'CALL BACK'}`, escapeHtml(m.placed_text || '')),
         box('Call:', `${escapeHtml(m.customer_name || 'Caller')} &nbsp; ${escapeHtml(m.customer_phone || 'no number given')}`, { big: true }),
         `<div style="margin:4px 0;"><b>Reason:</b> ${escapeHtml(m.reason || 'Not given')}</div>`,
-        mentioned ? `<div style="margin:4px 0;"><b>Not ordered yet, mentioned:</b> ${mentioned}</div>` : '',
+        m.wanted_pickup ? `<div style="margin:4px 0;"><b>Wanted pickup:</b> ${escapeHtml(m.wanted_pickup)}</div>` : '',
+        mentioned ? `<div style="margin:4px 0;"><b>${isUnfinished(m) ? 'In their unfinished order' : 'Not ordered yet, mentioned'}:</b> ${mentioned}</div>` : '',
         m.language && m.language !== 'en' ? `<div style="margin:4px 0;"><b>Caller spoke:</b> ${escapeHtml(LANGUAGE_NAMES[m.language] || m.language)}</div>` : '',
-        `<div style="margin:4px 0;">No order was placed.</div>`,
+        `<div style="margin:4px 0;">No order was placed.${isUnfinished(m) ? ' The caller hung up before confirming. Call to finish or confirm it.' : ''}</div>`,
         footer(m),
     ].join('\n'));
 }
