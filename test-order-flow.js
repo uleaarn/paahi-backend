@@ -12,10 +12,11 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { MenuService, openStatus, checkPickupTime, nextOpening } from './menu-service.js';
 import { EmailService } from './email-service.js';
+import { ticketHtml, ticketText, ticketSubject } from './staff-ticket.js';
 import { OrderState, PHASES, isExplicitConfirmation, normalizePhone } from './order-state.js';
 import { BusinessRegistry } from './business-registry.js';
 import { createConversation, actionsFactory } from './call-factory.js';
-import { BusinessActions, Notifier, syncBusiness } from './business-actions.js';
+import { BusinessActions, Notifier, syncBusiness, orderMessage } from './business-actions.js';
 import { Database } from './database.js';
 import { createDevDatabase } from './dev-database.js';
 import { TextToSpeech } from './tts.js';
@@ -890,7 +891,8 @@ test('email: Resend is used when its key is set, with a retry-safe idempotency k
     const body = JSON.parse(calls[0].init.body);
     assert.deepEqual(body.to, ['kitchen@jalwa.test']);
     assert.equal(body.from, '"Jalwa via Paahi" <onboarding@resend.dev>');
-    assert.match(body.subject, /^New Order: Babu - .*\(SCHEDULED Tuesday, Nov 17, 5:00 PM\)$/);
+    assert.equal(body.subject, 'Pickup order: Babu, SCHEDULED Tuesday, Nov 17, 5:00 PM');
+    assert.match(body.text, /PICKUP: SCHEDULED Tuesday, Nov 17, 5:00 PM/);
 });
 
 test('email: a Resend error is reported as a failure (so the outbox retries)', async () => {
@@ -899,4 +901,27 @@ test('email: a Resend error is reported as a failure (so the outbox retries)', a
     const r = await svc.sendOrderConfirmation({ type: 'order', timestamp: new Date().toISOString() }, { to: 'x@y.z' });
     assert.equal(r.success, false);
     assert.match(r.error, /Resend HTTP 403: You can only send testing emails/);
+});
+
+test('staff ticket: compact, print-friendly, escaped, and says only what is true', () => {
+    const biz = { id: 'jalwa-montclair', shortName: 'Jalwa', timezone: 'America/New_York' };
+    const m = orderMessage(biz, {
+        id: '7c1e9a42-0000-0000-0000-000000000000', call_sid: 'CA1', created_at: '2026-11-18T16:25:53Z', pickup_at: '2026-11-18T22:30:00Z',
+        order_type: 'pickup', customer_name: '<b>Babu</b>', customer_phone: '9735551234', subtotal: 28, language: 'hi',
+        order_notes: null, allergy_notes: 'Peanut allergy',
+        items: [{ quantity: 1, name: 'Chicken Tikka Masala', size: 'regular', modifiers: [{ name: 'White Meat', price: 2 }], line_total: 28, allergy_notes: 'no nuts' }],
+    });
+    const html = ticketHtml(m);
+    assert.match(html, /SCHEDULED Wednesday, Nov 18, 5:30 PM/);
+    assert.match(html, /Placed<\/b><\/td><td>Wed, Nov 18, 11:25 AM/);
+    assert.match(html, /\+ White Meat \(\$2\.00\)/);
+    assert.match(html, /ALLERGY:<\/b> Peanut allergy/);
+    assert.match(html, /Caller spoke:<\/b> Hindi/);
+    assert.match(html, /&lt;b&gt;Babu&lt;\/b&gt;/, 'caller text is escaped');
+    assert.doesNotMatch(html, /Ready in|notified|gradient|background:#(?!fff)/i, 'no invented promises, no colored blocks');
+    assert.doesNotMatch(html, /[\u{1F300}-\u{1FAFF}]/u, 'no emojis');
+    assert.equal(ticketSubject(m), 'Pickup order 7C1E9A42: <b>Babu</b>, SCHEDULED Wednesday, Nov 18, 5:30 PM, ALLERGY');
+    assert.match(ticketText(m), /^Jalwa - PICKUP ORDER #7C1E9A42\nPICKUP: SCHEDULED Wednesday, Nov 18, 5:30 PM/);
+    const asap = ticketHtml({ ...m, pickup_time: 'ASAP' });
+    assert.match(asap, /PICKUP:<\/b> As soon as possible/);
 });
