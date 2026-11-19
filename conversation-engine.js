@@ -269,6 +269,7 @@ export class ConversationEngine {
                 language: this.language,
                 phrases: this.phrases,
                 isOpen: this.isOpen(),
+                callerPhone: this.callerPhone,
                 businessName: this.business.shortName,
                 event: (type, data) => this.event(type, data),
             };
@@ -296,9 +297,17 @@ export class ConversationEngine {
                 }
                 return { forModel: { ok: true, language: code, note: `Reply in ${LANGUAGES[code].name} from now on.` } };
             }
-            case 'request_human':
+            case 'request_human': {
+                // An order that only lacks a callback number should be finished, not handed off.
+                const onlyPhone = this.workflows.some(w => w.hasUnfinishedWork() && String(w.missingFields?.() || []) === 'customer_phone');
+                if (onlyPhone && !this.phoneHandoffWarned) {
+                    this.phoneHandoffWarned = true;
+                    this.event('handoff_deferred', { reason: 'order_only_needs_phone' });
+                    return { forModel: { ok: false, error: 'order_only_needs_phone', message: `The order is complete except the callback number. ${this.callerPhone ? `Offer the Caller ID ${formatPhone(this.callerPhone)}` : 'Ask for a number'}, or wait while the caller finds one. Only call request_human again if the caller asks for a person.` } };
+                }
                 this.event('handoff_requested', { reason: args.reason });
                 return { forModel: { ok: true, note: 'Handled by system.' }, outcome: await this.requestHuman(args.reason) };
+            }
             case 'end_call':
                 if (this.workflows.some(w => w.hasUnfinishedWork())) {
                     return { forModel: { ok: false, error: 'work_in_progress', message: 'Something is still unfinished (for example an unsubmitted order). Ask the caller if they want to finish it.' } };

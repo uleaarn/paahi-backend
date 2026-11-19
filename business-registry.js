@@ -140,6 +140,8 @@ export class BusinessRegistry {
                 type: raw.business_type || null,
                 timezone: raw.timezone,
                 agentName: raw.agent_name || 'Paahi',
+                // Spoken respellings for the voice only, e.g. { "Jalwa": "Jahl-wah" }.
+                pronunciations: raw.pronunciations && typeof raw.pronunciations === 'object' ? raw.pronunciations : {},
                 locations: raw.locations,
                 languages: {
                     default: raw.languages.default,

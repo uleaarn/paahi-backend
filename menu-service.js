@@ -313,33 +313,80 @@ export function nextOpening(hours, now, timeZone, maxDays = 7) {
 }
 
 /**
- * Check a requested pickup time ("YYYY-MM-DD" + "HH:MM", business local time).
+ * Turn what the model heard into a local date: "today", "tomorrow", a weekday
+ * ("friday" = the next Friday, today if it is Friday) or "YYYY-MM-DD".
+ * The model is bad at date arithmetic late in the evening; code does it.
+ */
+export function resolvePickupDay(day, now, timeZone) {
+    const today = zonedParts(now, timeZone);
+    const d = String(day || '').trim().toLowerCase();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+    if (d === 'today' || d === 'tonight') return today.date;
+    if (d === 'tomorrow') return addDays(today.date, 1);
+    const target = DAYS.indexOf(d);
+    if (target >= 0) {
+        const from = DAYS.indexOf(today.day);
+        return addDays(today.date, (target - from + 7) % 7);
+    }
+    return null;
+}
+
+/** "19:30", "7:30 PM", "7 pm", "11:30am" -> minutes after midnight, or null. */
+export function parsePickupClock(text) {
+    const m = String(text || '').trim().toLowerCase().replace(/\./g, '').match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
+    if (!m) return null;
+    let h = Number(m[1]);
+    const mi = Number(m[2] || 0);
+    if (mi > 59) return null;
+    if (m[3]) {
+        if (h < 1 || h > 12) return null;
+        h = (h % 12) + (m[3] === 'pm' ? 12 : 0);
+    } else if (m[2] === undefined || h > 23) {
+        return null; // bare "7" is ambiguous
+    }
+    return h * 60 + mi;
+}
+
+/** "Wednesday, Nov 18 at 11:30 AM" */
+function whenLabel(at, timeZone) {
+    const day = new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'long', month: 'short', day: 'numeric' }).format(at);
+    const time = new Intl.DateTimeFormat('en-US', { timeZone, hour: 'numeric', minute: '2-digit' }).format(at);
+    return `${day} at ${time}`;
+}
+
+/**
+ * Check a requested pickup time (local date + clock time).
+ * Accepts { day, time } (day words, see resolvePickupDay) or { date, time }.
  * Rules: in the future by at least minLeadMinutes, within maxDaysAhead, and
  * inside opening hours that day (not in the last few minutes before closing).
  */
-export function checkPickupTime(hours, { date, time }, { now, timeZone, minLeadMinutes = 20, maxDaysAhead = 7, closingBufferMinutes = 15 }) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date)) || !/^\d{1,2}:\d{2}$/.test(String(time))) {
-        return { ok: false, error: 'invalid_time_format', message: 'Send date as YYYY-MM-DD and time as 24-hour HH:MM, in the business local time.' };
+export function checkPickupTime(hours, { day, date, time }, { now, timeZone, minLeadMinutes = 20, maxDaysAhead = 7, closingBufferMinutes = 15 }) {
+    date = resolvePickupDay(day ?? date, now, timeZone);
+    const minutes = parsePickupClock(time);
+    if (!date || minutes === null) {
+        return { ok: false, error: 'invalid_time_format', message: 'Send day as today, tomorrow, a weekday name or YYYY-MM-DD, and time like "19:30" or "7:30 PM".' };
     }
-    const [h, mi] = time.split(':').map(Number);
-    if (h > 23 || mi > 59) return { ok: false, error: 'invalid_time_format' };
-    const minutes = h * 60 + mi;
     const at = zonedTime(date, minutes, timeZone);
+    const understood = whenLabel(at, timeZone);
+    const nowLabel = whenLabel(now, timeZone);
     const today = zonedParts(now, timeZone).date;
+    if (at.getTime() <= now.getTime()) {
+        return { ok: false, error: 'time_has_passed', understood, now: nowLabel, message: `${understood} has already passed (it is now ${nowLabel}). If they meant a later day, say which day.` };
+    }
     if (at.getTime() < now.getTime() + minLeadMinutes * 60000) {
-        return { ok: false, error: 'too_soon', message: `Pickup must be at least ${minLeadMinutes} minutes from now.` };
+        return { ok: false, error: 'too_soon', understood, message: `Pickup must be at least ${minLeadMinutes} minutes from now (it is now ${nowLabel}).` };
     }
     if (date > addDays(today, maxDaysAhead)) {
-        return { ok: false, error: 'too_far_ahead', message: `Orders can be scheduled up to ${maxDaysAhead} days ahead.` };
+        return { ok: false, error: 'too_far_ahead', understood, message: `Orders can be scheduled up to ${maxDaysAhead} days ahead.` };
     }
-    const day = DAYS[new Date(`${date}T12:00:00Z`).getUTCDay()];
-    const ranges = dayRanges(hours?.[day]);
+    const weekday = DAYS[new Date(`${date}T12:00:00Z`).getUTCDay()];
+    const ranges = dayRanges(hours?.[weekday]);
     if (ranges === null) return { ok: false, error: 'hours_unknown' };
     const inside = ranges.some(([start, end]) => minutes >= start && minutes <= end - closingBufferMinutes);
     if (!inside) {
-        return { ok: false, error: 'outside_opening_hours', day, hours: hours[day], message: `Not open then. ${day} hours: ${hours[day]}.` };
+        return { ok: false, error: 'outside_opening_hours', understood, hours: hours[weekday], message: `Not open at ${understood}. ${weekday} hours: ${hours[weekday]}.` };
     }
-    return { ok: true, at };
+    return { ok: true, at, understood };
 }
 
 /** Is a menu category available at this instant? (e.g. lunch specials Mon-Thu 11:30-3) */

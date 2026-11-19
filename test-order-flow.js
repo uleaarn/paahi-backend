@@ -625,7 +625,7 @@ test('scheduled pickup times are checked against hours, lead time and how far ah
     assert.equal(checkPickupTime(hours, { date: '2026-11-17', time: '16:30' }, opts).error, 'outside_opening_hours');
     assert.equal(checkPickupTime(hours, { date: '2026-11-17', time: '22:25' }, opts).error, 'outside_opening_hours', 'not right at closing');
     assert.equal(checkPickupTime(hours, { date: '2026-11-30', time: '12:00' }, opts).error, 'too_far_ahead');
-    assert.equal(checkPickupTime(hours, { date: 'tomorrow', time: '7pm' }, opts).error, 'invalid_time_format');
+    assert.equal(checkPickupTime(hours, { date: 'someday', time: '7pm' }, opts).error, 'invalid_time_format');
     assert.equal(nextOpening(hours, CLOSED_TIME(), 'America/New_York').toISOString(), '2026-11-17T22:00:00.000Z');
 });
 
@@ -924,4 +924,44 @@ test('staff ticket: compact, print-friendly, escaped, and says only what is true
     assert.match(ticketText(m), /^Jalwa - PICKUP ORDER #7C1E9A42\nPICKUP: SCHEDULED Wednesday, Nov 18, 5:30 PM/);
     const asap = ticketHtml({ ...m, pickup_time: 'ASAP' });
     assert.match(asap, /PICKUP:<\/b> As soon as possible/);
+});
+
+test('missing callback number: Paahi offers Caller ID and keeps the call going instead of handing off', async () => {
+    const { engine, order } = await newEngine([
+        toolsMsg(toolCall('add_item', { item: 'butter chicken' }), toolCall('set_customer', { name: 'Babu' }), toolCall('read_back_order')),
+        textMsg('I just need a callback number.'),
+        toolsMsg(toolCall('request_human', { reason: 'Caller cannot provide a callback phone number' })),
+        textMsg('No problem. Is 973-555-0000, the number you are calling from, OK?'),
+    ], { callerPhone: '9735550000' });
+    const first = await engine.handleUtterance('one butter chicken for Babu');
+    assert.equal(first.endCall, false);
+    const missing = engine.events.find(e => e.type === 'tool' && e.name === 'read_back_order');
+    assert.equal(missing.error, 'missing_fields');
+    const r = await engine.handleUtterance("hold on, I don't have the number yet");
+    assert.equal(r.endCall, false, 'call stays up');
+    assert.equal(engine.handoff, null);
+    assert.ok(engine.events.some(e => e.type === 'handoff_deferred'));
+    assert.match(r.say, /calling from/);
+    assert.notEqual(order.phase, PHASES.HANDOFF);
+});
+
+test('pickup day words are resolved by code, late at night too', () => {
+    const hours = JSON.parse(fs.readFileSync(path.join(__dirname, 'businesses', 'jalwa-montclair', 'business.json'), 'utf-8')).locations[0].hours;
+    const lateWednesday = new Date('2026-11-19T03:09:42Z'); // 10:09 PM Wednesday in New York
+    const opts = { now: lateWednesday, timeZone: 'America/New_York' };
+    const tomorrow = checkPickupTime(hours, { day: 'tomorrow', time: '11:30 AM' }, opts);
+    assert.equal(tomorrow.ok, true);
+    assert.equal(tomorrow.understood, 'Thursday, Nov 19 at 11:30 AM');
+    const passed = checkPickupTime(hours, { day: 'today', time: '11:30' }, opts);
+    assert.equal(passed.error, 'time_has_passed');
+    assert.match(passed.message, /Wednesday, Nov 18 at 11:30 AM has already passed \(it is now Wednesday, Nov 18 at 10:09 PM\)/);
+    assert.equal(checkPickupTime(hours, { day: 'friday', time: '7:30 pm' }, opts).understood, 'Friday, Nov 20 at 7:30 PM');
+    assert.equal(checkPickupTime(hours, { day: 'tomorrow', time: '7' }, opts).error, 'invalid_time_format', 'bare "7" is ambiguous');
+});
+
+test('voice respells names the TTS says wrong, in speech only', () => {
+    const t = new TextToSpeech({});
+    assert.equal(t.applyPronunciations('Thank you for calling Jalwa. See you at Jalwa!', { pronunciations: { Jalwa: 'Jahl-wah' } }),
+        'Thank you for calling Jahl-wah. See you at Jahl-wah!');
+    assert.equal(t.applyPronunciations('Jalwas', { pronunciations: { Jalwa: 'Jahl-wah' } }), 'Jalwas', 'whole words only');
 });
