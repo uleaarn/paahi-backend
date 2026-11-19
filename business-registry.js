@@ -142,6 +142,8 @@ export class BusinessRegistry {
                 agentName: raw.agent_name || 'Paahi',
                 // Spoken respellings for the voice only, e.g. { "Jalwa": "Jahl-wah" }.
                 pronunciations: raw.pronunciations && typeof raw.pronunciations === 'object' ? raw.pronunciations : {},
+                // Sales tax on food, e.g. 6.625. Unset = totals are said "before tax".
+                taxRatePercent: typeof raw.tax_rate_percent === 'number' ? raw.tax_rate_percent : null,
                 locations: raw.locations,
                 languages: {
                     default: raw.languages.default,

@@ -19,20 +19,27 @@ export function escapeHtml(value) {
 }
 
 const money = n => `$${Number(n || 0).toFixed(2)}`;
-const shortId = id => (id ? String(id).slice(0, 8).toUpperCase() : '');
+export const withTax = (subtotal, ratePercent) => Math.round(Number(subtotal) * (100 + Number(ratePercent))) / 100;
+/** Short order number staff and callers use: first 4 characters of the id. */
+export const orderRef = id => (id ? String(id).replace(/-/g, '').slice(0, 4).toUpperCase() : '');
+const shortId = orderRef;
 
 /** Lines under an item: options, spice, notes, allergy. */
 function itemDetails(line) {
     const details = [];
     if (line.size && line.size !== 'regular') details.push({ text: `Size: ${line.size}` });
     for (const m of line.modifiers || []) details.push({ text: `+ ${m.name}${m.price ? ` (${money(m.price)})` : ''}` });
-    if (line.spice_level && line.spice_level !== 'regular') details.push({ text: `Spice: ${line.spice_level.replace('_', ' ')}` });
+    if (line.spice_level) details.push({ text: `Spice: ${line.spice_level.replace('_', ' ')}`, alert: line.spice_level !== 'medium' });
     if (line.special_instructions) details.push({ text: `Note: ${line.special_instructions}` });
     if (line.allergy_notes) details.push({ text: `ALLERGY: ${line.allergy_notes}`, alert: true });
     return details;
 }
 
 export function ticketSubject(m) {
+    if (m.type === 'order_cancelled') {
+        const when = m.pickup_time && m.pickup_time !== 'ASAP' ? ` for ${m.pickup_time}` : '';
+        return `CANCELLED order ${shortId(m.order_id)}: ${m.customer_name || 'Customer'}${when}. Do not prepare`;
+    }
     if (m.type === 'callback_request') return `CALL BACK: ${m.customer_name || 'Caller'} ${m.customer_phone || ''}`.trim();
     const when = m.pickup_time && m.pickup_time !== 'ASAP' ? `SCHEDULED ${m.pickup_time}` : 'ASAP';
     const type = m.order_type === 'delivery' ? 'Delivery' : 'Pickup';
@@ -71,6 +78,7 @@ function footer(m) {
 
 function orderHtml(m) {
     const scheduled = m.pickup_time && m.pickup_time !== 'ASAP';
+    const cancelled = m.type === 'order_cancelled';
     const type = m.order_type === 'delivery' ? 'DELIVERY' : 'PICKUP';
     const lines = m.items_structured || [];
     const rows = lines.map(l => {
@@ -89,7 +97,8 @@ function orderHtml(m) {
     ].join('');
 
     return page(ticketSubject(m), [
-        header(`${escapeHtml(m.business_name || '')} · ${type} ORDER`, `#${escapeHtml(shortId(m.order_id))}`),
+        header(`${escapeHtml(m.business_name || '')} · ${cancelled ? 'CANCELLED' : `${type} ORDER`}`, `#${escapeHtml(shortId(m.order_id))}`),
+        cancelled ? box('CANCELLED BY CALLER.', 'Do not prepare this order.', { big: true }) : '',
         box(`${type}:`, scheduled ? `SCHEDULED ${escapeHtml(m.pickup_time)}` : 'As soon as possible', { big: true }),
         `<table role="presentation" cellpadding="0" cellspacing="0" style="${FONT}border-collapse:collapse;margin:4px 0;font-size:13px;">
 <tr><td style="padding:1px 8px 1px 0;"><b>Customer</b></td><td>${escapeHtml(m.customer_name || 'Not given')}</td></tr>
@@ -99,6 +108,7 @@ function orderHtml(m) {
 <tr style="border-bottom:1px solid #000;"><th style="${CELL}text-align:left;">Qty</th><th style="${CELL}text-align:left;">Item</th><th style="${CELL}text-align:right;">Total</th></tr>
 ${rows || `<tr><td colspan="3" style="${CELL}">${escapeHtml(m.items || '')}</td></tr>`}
 <tr><td colspan="2" style="${CELL}${RULE}text-align:right;"><b>Subtotal</b> (before tax)</td><td style="${CELL}${RULE}text-align:right;"><b>${money(m.subtotal)}</b></td></tr>
+${m.tax_rate_percent ? `<tr><td colspan="2" style="${CELL}text-align:right;">Est. total with ${m.tax_rate_percent}% tax (POS has final)</td><td style="${CELL}text-align:right;">${money(withTax(m.subtotal, m.tax_rate_percent))}</td></tr>` : ''}
 </table>`,
         extras,
         footer(m),
@@ -135,6 +145,7 @@ export function ticketText(m) {
     }
     const type = m.order_type === 'delivery' ? 'DELIVERY' : 'PICKUP';
     const scheduled = m.pickup_time && m.pickup_time !== 'ASAP';
+    if (m.type === 'order_cancelled') out.push('CANCELLED BY CALLER. DO NOT PREPARE.');
     out.push(`${m.business_name || ''} - ${type} ORDER #${shortId(m.order_id)}`,
         `${type}: ${scheduled ? `SCHEDULED ${m.pickup_time}` : 'As soon as possible'}`,
         `Customer: ${m.customer_name || 'Not given'}  ${m.customer_phone || ''}`.trimEnd(),

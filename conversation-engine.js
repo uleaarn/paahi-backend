@@ -177,7 +177,8 @@ export class ConversationEngine {
     }
 
     isFinished() {
-        return this.ended || Boolean(this.handoff) || this.workflows.some(w => w.isComplete());
+        // A placed order doesn't end the call: the caller can still ask questions.
+        return this.ended || Boolean(this.handoff);
     }
 
     /**
@@ -365,6 +366,11 @@ export class ConversationEngine {
         if (!this.contactPhone()) {
             // Can't promise a callback without a number; keep the call going.
             return { say: this.phrases.askCallbackNumber, endCall: false, handoff: false };
+        }
+        // Nothing in progress: note it for staff and stay on the line for anything else.
+        if (!this.workflows.some(w => w.hasUnfinishedWork())) {
+            const sent = await this.noteForStaff(reason || 'caller_requested_human');
+            if (sent) return { say: this.phrases.callbackNoted(speakPhone(this.contactPhone())), endCall: false, handoff: false };
         }
         return this.failToCallback(reason || 'caller_requested_human');
     }

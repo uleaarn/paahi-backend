@@ -1,0 +1,187 @@
+{
+  "_note": "Extra names callers use, by menu item name. Kept separate from the POS export so a re-import keeps them.",
+  "Achar": [
+    "pickle",
+    "mixed pickle"
+  ],
+  "Aloo Gobi Masala Dum": [
+    "aloo gobi"
+  ],
+  "Aloo Parantha": [
+    "aloo paratha"
+  ],
+  "Aloo Tikki With Pindi Cholley": [
+    "aloo tikki",
+    "aloo tikki chole",
+    "aloo tikki with chole",
+    "aloo tikki chaat"
+  ],
+  "Anjeer Kofte": [
+    "anjeer kofta"
+  ],
+  "Basmati Rice": [
+    "plain rice",
+    "white rice"
+  ],
+  "Bhindi Jalwa": [
+    "crispy okra",
+    "crispy bhindi"
+  ],
+  "Bhindi Masala": [
+    "okra masala"
+  ],
+  "Chicken Makhani": [
+    "butter chicken makhani"
+  ],
+  "Chicken Saagwala": [
+    "chicken saag"
+  ],
+  "Chicken Tandoori Momo": [
+    "chicken momo",
+    "momos"
+  ],
+  "Chicken Tikka Masala": [
+    "tikka masala",
+    "ctm"
+  ],
+  "Classic Goat Curry": [
+    "goat curry"
+  ],
+  "Coke": [
+    "coca cola"
+  ],
+  "Dahi Aloo Papri": [
+    "papri chaat",
+    "dahi papri chaat"
+  ],
+  "Dahi Ke Kabab": [
+    "dahi kabab"
+  ],
+  "Dal Jalwa": [
+    "dal yellow",
+    "yellow dal"
+  ],
+  "Dosa": [
+    "dosa",
+    "masala dosa",
+    "plain dosa",
+    "build your own dosa"
+  ],
+  "Dum Pukht Chicken Biryani": [
+    "chicken biryani"
+  ],
+  "Dum Pukht Goat Biryani": [
+    "goat biryani"
+  ],
+  "Dum Pukht Lamb Biryani": [
+    "lamb biryani"
+  ],
+  "Hyderabadi Chicken Dum Biryani": [
+    "hyderabadi biryani"
+  ],
+  "Jalwa Bread Basket": [
+    "bread basket"
+  ],
+  "Jalwa Lamb Chops": [
+    "lamb chops"
+  ],
+  "Jalwa Lamb Korma": [
+    "lamb korma"
+  ],
+  "Jalwa Tandoori Mix Grill": [
+    "mixed grill",
+    "tandoori mixed grill"
+  ],
+  "Kadai Chicken": [
+    "chicken kadai"
+  ],
+  "Kadai Paneer": [
+    "paneer kadai"
+  ],
+  "Lacha Paratha": [
+    "lachha paratha"
+  ],
+  "Lunch Special": [
+    "lunch combo",
+    "lunch deal",
+    "lunch special combo"
+  ],
+  "Mahi Tandoori": [
+    "tandoori salmon",
+    "tandoori fish"
+  ],
+  "Malai Kofte": [
+    "malai kofta"
+  ],
+  "Malai Kulfi Ice Cream": [
+    "kulfi"
+  ],
+  "Masala Tea": [
+    "chai",
+    "masala chai"
+  ],
+  "Medu Vada": [
+    "vada"
+  ],
+  "Murgh Malai Kabab": [
+    "malai kabab",
+    "chicken malai kabab"
+  ],
+  "Palak Paneer": [
+    "saag paneer"
+  ],
+  "Papad and Chutney": [
+    "papad",
+    "papadum"
+  ],
+  "Pellegrino Water": [
+    "sparkling water",
+    "san pellegrino"
+  ],
+  "Peshwari Naan": [
+    "peshawari naan"
+  ],
+  "Pindi Cholley": [
+    "pindi chole",
+    "pindi chana"
+  ],
+  "Rasmalai": [
+    "ras malai",
+    "shakori rasmalai"
+  ],
+  "Saffron Basmati Rice": [
+    "saffron rice"
+  ],
+  "Shahi Murgh Korma": [
+    "chicken korma"
+  ],
+  "Still Water": [
+    "water",
+    "bottled water"
+  ],
+  "Tariwala Kukkad": [
+    "homestyle chicken curry"
+  ],
+  "The Original Mango Chutney": [
+    "mango chutney"
+  ],
+  "Truffle Bhuna Chicken Bao Buns": [
+    "bao buns",
+    "chicken bao buns"
+  ],
+  "Veg Kolhapuri": [
+    "vegetable kolhapuri"
+  ],
+  "Vegetable Biryani": [
+    "veg biryani"
+  ],
+  "Vegetable Korma": [
+    "veg korma",
+    "navratan korma"
+  ],
+  "Vegetable Samosa": [
+    "samosa",
+    "samosas",
+    "veg samosa"
+  ]
+}

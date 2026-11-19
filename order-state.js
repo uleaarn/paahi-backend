@@ -56,7 +56,9 @@ export class OrderState {
      * @param {boolean} [opts.deliveryEnabled]
      * @param {() => Date} [opts.clock]
      */
-    constructor({ callId, menu, deliveryEnabled = false, clock = () => new Date(), timeZone = 'America/New_York' }) {
+    constructor({ callId, menu, deliveryEnabled = false, clock = () => new Date(), timeZone = 'America/New_York', taxRatePercent = null, orderIndex = 1 }) {
+        this.taxRatePercent = taxRatePercent;
+        this.orderIndex = orderIndex; // 2nd order in the same call gets its own idempotency key
         this.menu = menu;
         this.deliveryEnabled = deliveryEnabled;
         this.clock = clock;
@@ -160,10 +162,13 @@ export class OrderState {
             if (!resolved.some(m => m.id === mod.modifier.id)) resolved.push(mod.modifier);
         }
 
+        const choices = this.menu.checkChoices(item, resolved);
+        if (!choices.ok) return choices;
+
         const spice = this.menu.resolveSpice(item, spice_level);
         if (!spice.ok) return { ...spice, item: item.name, requested: spice_level };
 
-        return { ok: true, size: sizeResult.size, modifiers: resolved, spice: spice.spice };
+        return { ok: true, size: sizeResult.size, modifiers: resolved.map(({ available, ...m }) => m), spice: spice.spice };
     }
 
     addItem({ item, quantity, size, modifiers, spice_level, special_instructions, allergy_notes } = {}) {
@@ -360,6 +365,7 @@ export class OrderState {
             address: type === 'delivery' ? c.delivery_address : null,
             when: this.pickupLabel(language),
             subtotal: p.money(this.data.subtotal),
+            total: this.taxRatePercent ? p.money(this.totalWithTax()) : null,
             phone: speakPhone(c.phone),
         }).filter(Boolean);
 
@@ -422,7 +428,11 @@ export class OrderState {
 
     /** Idempotency key: one order per call. */
     idempotencyKey() {
-        return `paahi:${this.data.call_id}:order`;
+        return `paahi:${this.data.call_id}:order${this.orderIndex > 1 ? `:${this.orderIndex}` : ''}`;
+    }
+
+    totalWithTax() {
+        return Math.round(this.data.subtotal * (100 + this.taxRatePercent)) / 100;
     }
 
     snapshot() {

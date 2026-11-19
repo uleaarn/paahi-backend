@@ -17,8 +17,10 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { MenuService, checkPickupTime, nextOpening, zonedParts } from '../menu-service.js';
-import { OrderState, PHASES, formatPhone } from '../order-state.js';
+import { MenuService, checkPickupTime, nextOpening, zonedParts, earliestPickup, whenText } from '../menu-service.js';
+import { orderRef } from '../staff-ticket.js';
+import { isExplicitConfirmation } from '../languages.js';
+import { OrderState, PHASES, formatPhone, normalizePhone, speakPhone } from '../order-state.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const INSTRUCTIONS = fs.readFileSync(path.join(__dirname, 'restaurant-ordering.md'), 'utf-8');
@@ -36,8 +38,8 @@ const SCHEDULE_DEFAULTS = { min_lead_minutes: 20, max_days_ahead: 7 };
 const itemOptionProps = {
     quantity: { type: 'integer', minimum: 1, description: 'How many. Default 1.' },
     size: { type: 'string', description: 'Size name if the item has sizes (e.g. half, full, large).' },
-    modifiers: { type: 'array', items: { type: 'string' }, description: 'Changes like "no onion", "extra garlic", "butter".' },
-    spice_level: { type: 'string', enum: ['mild', 'regular', 'extra_spicy'], description: 'Only if the caller asked.' },
+    modifiers: { type: 'array', items: { type: 'string' }, description: 'Choices and add-ons by name, e.g. the lunch special\'s starter, entree and bread, or "white meat".' },
+    spice_level: { type: 'string', enum: ['mild', 'medium', 'spicy'], description: 'For dishes marked "spice": ask mild, medium or spicy if the caller didn\'t say.' },
     special_instructions: { type: 'string', description: 'Short kitchen note for this item.' },
     allergy_notes: { type: 'string', description: 'Allergy the caller mentioned for this item.' },
 };
@@ -97,6 +99,22 @@ const TOOLS = [
             },
         },
         schedulingOnly: true,
+    },
+    {
+        name: 'find_my_orders',
+        description: 'Look up the caller\'s existing orders (placed earlier, still to be picked up) by callback number. Uses the Caller ID unless the caller gives another number; then their name is needed too.',
+        parameters: {
+            type: 'object',
+            properties: {
+                phone: { type: 'string', description: 'Only if the caller gave a number different from the Caller ID.' },
+                name: { type: 'string', description: 'Name on the order (needed with a different number).' },
+            },
+        },
+    },
+    {
+        name: 'cancel_order',
+        description: 'Cancel one order found by find_my_orders, ONLY after the caller clearly said yes to cancelling that order. Staff are told.',
+        parameters: { type: 'object', properties: { order_number: { type: 'string', description: 'The order number from find_my_orders, e.g. "7C1E".' } }, required: ['order_number'] },
     },
     {
         name: 'read_back_order',
@@ -164,13 +182,18 @@ function phoneHint(callerPhone) {
         : 'Ask for a callback number. If they need a moment to find it, wait. A missing number is never a reason to hand off or end the call.';
 }
 
-export function createSession({ prepared, callId, clock, submitter, business, location }) {
-    return new RestaurantOrderingSession({ prepared, callId, clock, submitter, business, location });
+export function createSession({ prepared, callId, clock, submitter, business, location, callerPhone }) {
+    return new RestaurantOrderingSession({ prepared, callId, clock, submitter, business, location, callerPhone });
 }
 
 class RestaurantOrderingSession {
-    constructor({ prepared, callId, clock, submitter, business, location }) {
+    constructor({ prepared, callId, clock, submitter, business, location, callerPhone }) {
         this.id = id;
+        this.callId = callId;
+        this.callerPhone = normalizePhone(callerPhone);
+        this.taxRatePercent = business?.taxRatePercent ?? null;
+        this.foundOrders = new Map(); // order number -> order id, from find_my_orders in this call
+        this.placedOrders = [];       // orders placed in this call: { ref, id }
         this.locationId = location?.id || null;
         this.hours = location?.hours || null;
         this.timeZone = business?.timezone || 'America/New_York';
@@ -179,16 +202,54 @@ class RestaurantOrderingSession {
         this.orderTypes = prepared.orderTypes;
         this.scheduling = prepared.scheduling || null;
         this.submitter = submitter;
-        this.order = new OrderState({
-            callId,
+        this.order = this.newOrder(1);
+        this.readbackTurn = null;
+        this.tools = toolDefs({ scheduling: Boolean(this.scheduling) });
+    }
+
+    /** A fresh order. The callback number starts as the Caller ID; the readback says it, so the caller can change it. */
+    newOrder(index, previous = null) {
+        const order = new OrderState({
+            callId: this.callId,
             menu: this.menu,
             deliveryEnabled: this.orderTypes.includes('delivery'),
             clock: this.clock,
             timeZone: this.timeZone,
+            taxRatePercent: this.taxRatePercent,
+            orderIndex: index,
         });
-        if (this.orderTypes.length === 1) this.order.setIntent(this.orderTypes[0]);
-        this.readbackTurn = null;
-        this.tools = toolDefs({ scheduling: Boolean(this.scheduling) });
+        if (this.orderTypes.length === 1) order.setIntent(this.orderTypes[0]);
+        const phone = previous?.data.customer.phone || this.callerPhone;
+        if (phone) order.setCustomer({ phone });
+        if (previous?.data.customer.name) order.setCustomer({ name: previous.data.customer.name });
+        return order;
+    }
+
+    /** Orders for this caller's number, labelled for the caller and remembered by order number. */
+    async lookupOrders(phone) {
+        if (!this.submitter.findOrders) return [];
+        const rows = await this.submitter.findOrders({ phone, now: this.clock() });
+        return rows.map(r => {
+            const ref = orderRef(r.id);
+            this.foundOrders.set(ref, r.id);
+            return {
+                order_number: ref,
+                name: r.customer_name,
+                pickup: r.pickup_at ? whenText(new Date(r.pickup_at), this.timeZone) : `as soon as possible (ordered ${whenText(new Date(r.created_at), this.timeZone)})`,
+                items: (r.items || []).map(l => `${l.quantity} x ${l.name}`).join(', '),
+                subtotal: Number(r.subtotal),
+                placed_in_this_call: r.call_sid === this.callId,
+                _pickupDay: zonedParts(new Date(r.pickup_at || r.created_at), this.timeZone).date,
+            };
+        });
+    }
+
+    earliestLabel() {
+        if (!this.scheduling) return null;
+        const at = earliestPickup(this.hours, this.clock(), this.timeZone, {
+            minLeadMinutes: this.scheduling.min_lead_minutes, maxDaysAhead: this.scheduling.max_days_ahead,
+        });
+        return at ? whenText(at, this.timeZone) : null;
     }
 
     nextOpeningLabel() {
@@ -202,8 +263,9 @@ class RestaurantOrderingSession {
             return 'Scheduled orders: not offered. Orders are for pickup as soon as possible while open.';
         }
         const today = zonedParts(this.clock(), this.timeZone);
+        const earliest = this.earliestLabel();
         return [
-            `Today is ${today.day} ${today.date} (business local time). Scheduled pickup: allowed up to ${this.scheduling.max_days_ahead} days ahead, during opening hours, at least ${this.scheduling.min_lead_minutes} minutes from now.`,
+            `Today is ${today.day} ${today.date} (business local time). Scheduled pickup: allowed up to ${this.scheduling.max_days_ahead} days ahead, during opening hours, at least ${this.scheduling.min_lead_minutes} minutes from now.${earliest ? ` Earliest possible pickup: ${earliest}. If the caller asks for "as soon as possible" or a time before that, offer this time.` : ''}`,
             'If the caller wants it later or names a time, call set_pickup_time with day ("today", "tomorrow", a weekday) and time. Don\'t work out dates yourself. While open and no time is given, pickup is as soon as possible.',
         ].join('\n');
     }
@@ -230,6 +292,13 @@ class RestaurantOrderingSession {
 
     hasUnfinishedWork() {
         return this.order.data.items.length > 0 && this.order.phase !== PHASES.SUBMITTED;
+    }
+
+    /** After an order is placed, adding food starts a second order (same name and number). */
+    startAnotherOrderIfPlaced() {
+        if (this.order.phase !== PHASES.SUBMITTED) return;
+        this.order = this.newOrder(this.order.orderIndex + 1, this.order);
+        this.readbackTurn = null;
     }
 
     isComplete() {
@@ -297,11 +366,57 @@ class RestaurantOrderingSession {
                     now: this.clock(), timeZone: this.timeZone,
                     minLeadMinutes: this.scheduling.min_lead_minutes, maxDaysAhead: this.scheduling.max_days_ahead,
                 });
-                if (!check.ok) return { forModel: check };
+                if (!check.ok) {
+                    const earliest = this.earliestLabel();
+                    return { forModel: earliest && check.error !== 'invalid_time_format' ? { ...check, earliest_possible: earliest } : check };
+                }
                 return { forModel: order.setPickupTime(check.at) };
             }
             case 'set_order_type': return { forModel: order.setIntent(args.type) };
-            case 'add_item': return { forModel: order.addItem(args) };
+            case 'add_item':
+                this.startAnotherOrderIfPlaced();
+                return { forModel: this.order.addItem(args) };
+            case 'find_my_orders': {
+                let phone = this.order.data.customer.phone || this.callerPhone;
+                const asked = args.phone ? normalizePhone(args.phone) : null;
+                if (args.phone && !asked) return { forModel: { ok: false, error: 'invalid_phone' } };
+                // A number other than the one they're calling from needs the name on the order too.
+                const needsName = asked && asked !== this.callerPhone;
+                if (asked) phone = asked;
+                if (!phone) return { forModel: { ok: false, error: 'phone_needed', message: 'Ask for the callback number used on the order.' } };
+                if (needsName && !args.name) return { forModel: { ok: false, error: 'name_needed', message: 'Ask for the name on the order.' } };
+                let found = await this.lookupOrders(phone);
+                if (needsName) {
+                    const first = s => String(s || '').trim().toLowerCase().split(/\s+/)[0];
+                    found = found.filter(o => first(o.name) === first(args.name));
+                }
+                ctx.event('orders_looked_up', { found: found.length });
+                const clean = found.map(({ _pickupDay, ...o }) => o);
+                return {
+                    forModel: {
+                        ok: true,
+                        phone: formatPhone(phone),
+                        orders: clean,
+                        message: clean.length
+                            ? 'Read each order to the caller: order number, pickup time and items. To cancel one, ask them to confirm, then call cancel_order.'
+                            : `No open orders for ${formatPhone(phone)}. Tell the caller, and ask if it may be under another number.`,
+                    },
+                };
+            }
+            case 'cancel_order': {
+                const ref = String(args.order_number || '').replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 4);
+                const orderId = this.foundOrders.get(ref);
+                if (!orderId) return { forModel: { ok: false, error: 'unknown_order_number', message: 'Only orders found with find_my_orders in this call can be cancelled. Look them up first.' } };
+                const said = String(ctx.lastUserUtterance || '');
+                if (!/cancel|cancela|annul/i.test(said) && !isExplicitConfirmation(said, ctx.language)) {
+                    return { forModel: { ok: false, error: 'cancel_not_confirmed', message: `Ask: "Should I cancel order ${ref}?" and wait for a clear yes.` } };
+                }
+                const r = await this.submitter.cancelOrder({ orderId });
+                if (!r.success) return { forModel: { ok: false, error: r.error, message: r.error === 'not_cancellable' ? 'That order is already cancelled or finished.' : 'Could not cancel it. Offer a staff callback with request_human.' } };
+                this.foundOrders.delete(ref);
+                ctx.event('order_cancelled', { order_number: ref });
+                return { forModel: { ok: true, cancelled: ref, message: `Tell the caller: "Order ${ref} is cancelled." Then say which of their orders remain (if any), and ask if there's anything else.` } };
+            }
             case 'update_item': return { forModel: order.updateItem(args) };
             case 'remove_item': return { forModel: order.removeItem(args) };
             case 'set_customer': return { forModel: order.setCustomer(args) };
@@ -321,8 +436,19 @@ class RestaurantOrderingSession {
                     return { forModel: result };
                 }
                 this.readbackTurn = ctx.turn;
+                const forModel = { ok: true, note: 'Readback spoken to caller. Wait for their answer.' };
+                // Possible duplicate: this number already has an order for the same day.
+                try {
+                    const day = zonedParts(order.data.requested_time ? new Date(order.data.requested_time) : this.clock(), this.timeZone).date;
+                    const same = (await this.lookupOrders(order.data.customer.phone)).filter(o => o._pickupDay === day && !o.placed_in_this_call);
+                    if (same.length) {
+                        forModel.existing_orders_same_day = same.map(({ _pickupDay, ...o }) => o);
+                        forModel.note = 'Readback spoken. This number already has an order for that day (existing_orders_same_day). When the caller answers, ask whether this new order is in addition to it or replaces it. If it replaces it: place this one, then cancel the old one with cancel_order after they confirm.';
+                        ctx.event('possible_duplicate', { count: same.length });
+                    }
+                } catch { /* lookup is a courtesy; never block the order */ }
                 return {
-                    forModel: { ok: true, note: 'Readback spoken to caller. Wait for their answer.' },
+                    forModel,
                     outcome: { say: result.say_exactly, endCall: false, handoff: false, readback: true },
                 };
             }
@@ -359,8 +485,20 @@ class RestaurantOrderingSession {
         const result = await this.submitter.submit(snapshot, this.order.idempotencyKey(), { locationId: this.locationId, language: ctx.language });
         if (result.success) {
             this.order.markSubmitted(result);
+            const ref = orderRef(result.order_id);
+            this.placedOrders.push({ ref, id: result.order_id });
+            this.foundOrders.set(ref, result.order_id); // the caller may change their mind in this call
             ctx.event('order_submitted', { duplicate: Boolean(result.duplicate), order_id: result.order_id, notifications: result.notifications });
-            return { say: ctx.phrases.orderPlaced(snapshot.customer.name, ctx.businessName), endCall: true, handoff: false };
+            const p = ctx.phrases;
+            const say = p.orderPlaced({
+                name: snapshot.customer.name,
+                ref: ref.split('').join(' '),
+                when: this.order.pickupLabel(ctx.language),
+                subtotal: p.money(snapshot.subtotal),
+                total: this.taxRatePercent ? p.money(this.order.totalWithTax()) : null,
+            });
+            // The call stays open: the caller hears the confirmation and can ask for anything else.
+            return { say, endCall: false, handoff: false };
         }
         this.order.markSubmissionFailed(result);
         ctx.event('order_submit_failed', { error: result.error });
