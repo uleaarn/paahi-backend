@@ -365,6 +365,7 @@ export class OrderState {
 
         this.data.status = PHASES.AWAITING_CONFIRMATION;
         this.data.confirmation_status = 'awaiting';
+        this.readbackInterrupted = false;
         this.readbackVersion = this.version;
         this.data.readback_language = language;
         return { ok: true, say_exactly: sentences.join(' ') };
@@ -376,7 +377,9 @@ export class OrderState {
      */
     confirm({ callerUtterance, language = 'en' } = {}) {
         if (this.phase !== PHASES.AWAITING_CONFIRMATION) {
-            return { ok: false, error: 'read_back_first', message: 'Read the order back before asking for confirmation.' };
+            return this.readbackInterrupted
+                ? { ok: false, error: 'readback_was_interrupted', message: 'The caller talked over the readback, so they did not hear all of it (including the total). Call read_back_order again.' }
+                : { ok: false, error: 'read_back_first', message: 'Read the order back before asking for confirmation.' };
         }
         if (this.readbackVersion !== this.version) {
             return { ok: false, error: 'order_changed_since_readback' };
@@ -432,6 +435,7 @@ export class OrderState {
             phase: this.phase,
             order_type: this.data.intent,
             pickup_time: this.data.requested_time ? this.pickupLabel('en') : 'as soon as possible',
+            ...(this.readbackInterrupted ? { note: 'Caller talked over the last readback; read it back again before asking to confirm.' } : {}),
             items: this.data.items.map(l => ({ line_id: l.line_id, text: this.describeLine(l), line_total: l.line_total })),
             subtotal: this.data.subtotal,
             customer: {

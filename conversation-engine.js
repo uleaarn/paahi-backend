@@ -305,6 +305,19 @@ export class ConversationEngine {
                     this.event('handoff_deferred', { reason: 'order_only_needs_phone' });
                     return { forModel: { ok: false, error: 'order_only_needs_phone', message: `The order is complete except the callback number. ${this.callerPhone ? `Offer the Caller ID ${formatPhone(this.callerPhone)}` : 'Ask for a number'}, or wait while the caller finds one. Only call request_human again if the caller asks for a person.` } };
                 }
+                // An order is in progress: a side request (e.g. "cancel my other order") must not
+                // throw the current order away. Staff get a note; the order and call continue.
+                // Asking a second time during the same order means the caller really wants a person.
+                const orderOpen = this.workflows.some(w => w.hasUnfinishedWork());
+                if (orderOpen && !this.staffNoteSent && this.contactPhone()) {
+                    this.staffNoteSent = true;
+                    const noted = await this.noteForStaff(args.reason);
+                    return {
+                        forModel: noted
+                            ? { ok: true, staff_note_sent: true, message: 'Staff were sent a note and will call back about that. Tell the caller in one short sentence. The current order is NOT placed yet: carry on with it (read it back if needed, then ask them to confirm) unless they say to cancel it.' }
+                            : { ok: false, error: 'note_failed', message: 'Could not send a note to staff. Tell the caller staff can help if they call the restaurant, and carry on with the current order.' },
+                    };
+                }
                 this.event('handoff_requested', { reason: args.reason });
                 return { forModel: { ok: true, note: 'Handled by system.' }, outcome: await this.requestHuman(args.reason) };
             }
@@ -323,6 +336,29 @@ export class ConversationEngine {
     contactPhone() {
         for (const w of this.workflows) if (w.contactPhone()) return w.contactPhone();
         return this.callerPhone;
+    }
+
+    /** Send staff a callback note without ending the call or touching the order. */
+    async noteForStaff(reason) {
+        if (!this.business.escalation.callbackEnabled || !this.submitter?.notifyCallback) return false;
+        const r = await this.submitter.notifyCallback({
+            call_id: this.callId,
+            phone: this.contactPhone(),
+            name: this.workflows.map(w => w.contactName?.()).find(Boolean) || null,
+            reason,
+            language: this.language,
+            order: this.workflows[0]?.snapshot() || null,
+            locationId: this.location.id,
+        });
+        this.event('staff_note', { reason, sent: Boolean(r?.success) });
+        return Boolean(r?.success);
+    }
+
+    /** The caller talked over a readback before hearing most of it: it doesn't count. */
+    readbackInterrupted() {
+        for (const w of this.workflows) {
+            if (w.onReadbackInterrupted?.()) this.event('readback_interrupted');
+        }
     }
 
     async requestHuman(reason) {
