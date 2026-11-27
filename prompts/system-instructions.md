@@ -220,7 +220,5 @@ When asked about dietary restrictions:
 
 ## Customization Options
 All dishes can be customized with modifiers:
-- **Spice Level**: Extra Spicy, Mild
-- **Dietary**: No Onion, No Garlic, No Yogurt, No Paneer
-- **Extras**: Mint Chutney (+$1), Tamarind Chutney (+$1), Extra Sauce (+$1.50), Extra Cream (+$1)
-- **Breads**: Add Butter (+$0.50), Extra Garlic (+$1.50)
+- **Spice Level**: Spicy, Medium, Mild
+- **Dietary**: No Onion, No Garlic, No Yogurt
