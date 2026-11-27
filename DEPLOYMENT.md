@@ -10,6 +10,8 @@ This project is ready for Railway, Render, Fly.io, or any Node.js host that supp
 - `DEEPGRAM_API_KEY`
 - `GOOGLE_APPLICATION_CREDENTIALS_JSON`: optional. Only needed for Spanish, French, Hindi or Telugu, or as a backup English voice. English uses Deepgram.
 - `DATABASE_URL`: Supabase Postgres as the `paahi_app` role (see `docs/DATABASE.md`). Optionally `DATABASE_CA_CERT`.
+- `TWILIO_AUTH_TOKEN`: the Twilio account auth token. The server won't start without it. It checks the signature on every `/twiml` request and signs the token each media stream must carry. Use the token of the account that owns the phone numbers.
+- `PUBLIC_BASE_URL`: optional. Only if Twilio calls an address the app can't see (for example a custom domain behind a proxy that rewrites the Host header).
 
 ## Routing and Business Settings
 
@@ -50,11 +52,15 @@ The app returns TwiML that connects Twilio Media Streams to:
 wss://YOUR_PUBLIC_DOMAIN/media-stream
 ```
 
+Requests without a valid Twilio signature get `403`, and a media stream without the token from `/twiml` is closed. The webhook URL in Twilio must match the public address exactly (scheme, host, path), because Twilio signs that URL. If calls start failing with `/twiml rejected` in the logs, compare the address in that log line with the webhook URL in the Twilio console.
+
 ## Local Production Test
 
 ```bash
 npm start
 ```
+
+Set `TWILIO_AUTH_TOKEN` as in production. Signatures work through ngrok because it forwards the public host.
 
 Expose it for Twilio:
 

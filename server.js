@@ -18,6 +18,7 @@ import { Database, pgAdapter } from './database.js';
 import { Notifier, syncBusiness, notificationChannels } from './business-actions.js';
 import { LANGUAGES } from './languages.js';
 import { TextToSpeech } from './tts.js';
+import { isValidTwilioSignature, requestUrl, issueStreamToken, verifyStreamToken } from './twilio-security.js';
 // Polyfill WebSocket for Deepgram SDK
 globalThis.WebSocket = WebSocket;
 
@@ -52,11 +53,27 @@ const DATABASE_URL = process.env.DATABASE_URL;
 const DATABASE_CA_CERT = process.env.DATABASE_CA_CERT || null;
 // Testing switch. Leave false in production.
 const ALLOW_ORDERS_WHEN_CLOSED = process.env.ALLOW_ORDERS_WHEN_CLOSED === 'true';
+// Twilio request checks (see twilio-security.js). The auth token signs Twilio's webhooks
+// and this server's media-stream tokens. TWILIO_SIGNATURE_CHECK=off is for local testing only.
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || null;
+const TWILIO_SIGNATURE_CHECK = process.env.TWILIO_SIGNATURE_CHECK !== 'off';
+// Optional: the public address Twilio calls, e.g. https://paahi.example.com, when a proxy hides it.
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || null;
+// A media stream that hasn't sent a valid 'start' by then is closed.
+const STREAM_START_TIMEOUT_MS = 10000;
 
 if (!OPENAI_API_KEY || !DEEPGRAM_API_KEY || !DATABASE_URL) {
     console.error('❌ Missing required configuration');
     console.error('Required: OPENAI_API_KEY, DEEPGRAM_API_KEY, DATABASE_URL');
     process.exit(1);
+}
+if (TWILIO_SIGNATURE_CHECK && !TWILIO_AUTH_TOKEN) {
+    console.error('❌ Missing TWILIO_AUTH_TOKEN: needed to check that calls come from Twilio');
+    console.error('Set it to the Twilio account auth token (or TWILIO_SIGNATURE_CHECK=off for local testing only)');
+    process.exit(1);
+}
+if (!TWILIO_SIGNATURE_CHECK) {
+    console.warn('⚠️ TWILIO_SIGNATURE_CHECK=off: anyone can place calls through this server. Never use this in production.');
 }
 
 // Orders, callback requests and call records live in Postgres; each transaction is scoped to one business.
@@ -771,9 +788,25 @@ function xmlEscape(value) {
 }
 
 fastify.post('/twiml', async (request, reply) => {
+    // Only Twilio may start a call: check the signature before doing anything else.
+    if (TWILIO_SIGNATURE_CHECK) {
+        const url = requestUrl(request, PUBLIC_BASE_URL);
+        const valid = isValidTwilioSignature({
+            authToken: TWILIO_AUTH_TOKEN,
+            signature: request.headers['x-twilio-signature'],
+            url,
+            params: request.body || {},
+        });
+        if (!valid) {
+            console.warn(`🚫 /twiml rejected: missing or invalid Twilio signature (checked against ${url})`);
+            return reply.code(403).type('text/plain').send('Forbidden');
+        }
+    }
+
     const wsUrl = `wss://${request.headers.host}/media-stream`;
     const from = request.body?.From || '';
     const to = request.body?.To || '';
+    const callSid = request.body?.CallSid || '';
 
     // Route by the number that was dialed: one number -> one business.
     const route = registry.resolve(to);
@@ -788,7 +821,12 @@ fastify.post('/twiml', async (request, reply) => {
     }
     console.log(`📞 Incoming call for ${route.business.id} (${route.routedBy}) - WebSocket URL: ${wsUrl}`);
 
-    // Pass business and caller ID to the media stream.
+    // Pass business and caller ID to the media stream, with a token that ties them to this call.
+    const streamToken = TWILIO_SIGNATURE_CHECK
+        ? issueStreamToken(TWILIO_AUTH_TOKEN, {
+            callSid, businessId: route.business.id, locationId: route.location.id, routedBy: route.routedBy, from,
+        })
+        : '';
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Connect>
@@ -797,11 +835,12 @@ fastify.post('/twiml', async (request, reply) => {
             <Parameter name="location_id" value="${xmlEscape(route.location.id)}" />
             <Parameter name="routed_by" value="${xmlEscape(route.routedBy)}" />
             <Parameter name="from" value="${xmlEscape(from)}" />
+            <Parameter name="stream_token" value="${xmlEscape(streamToken)}" />
         </Stream>
     </Connect>
 </Response>`;
 
-    console.log(`📤 TwiML Response: ${twimlResponse}`);
+    console.log(`📤 TwiML Response: ${twimlResponse.replace(/(name="stream_token" value=")[^"]*/, '$1…')}`);
     reply.type('text/xml').send(twimlResponse);
 });
 
@@ -809,6 +848,14 @@ fastify.register(async (fastify) => {
     fastify.get('/media-stream', { websocket: true }, (connection, req) => {
         console.log('📞 Twilio connected');
         let session = null;
+        let started = false;
+        // Close streams that never identify themselves, so idle sockets can't pile up.
+        const startTimer = setTimeout(() => {
+            if (!started) {
+                console.warn('🚫 Media stream sent no valid start; closing');
+                connection.close();
+            }
+        }, STREAM_START_TIMEOUT_MS);
 
         connection.on('message', async (message) => {
             try {
@@ -816,8 +863,26 @@ fastify.register(async (fastify) => {
 
                 switch (msg.event) {
                     case 'start':
+                        if (started) return; // one call per stream
                         const streamSid = msg.start.streamSid;
                         const params = msg.start.customParameters || {};
+                        // The stream must carry the token /twiml issued for this call SID and these parameters.
+                        if (TWILIO_SIGNATURE_CHECK) {
+                            const check = verifyStreamToken(TWILIO_AUTH_TOKEN, params.stream_token, {
+                                callSid: msg.start.callSid,
+                                businessId: params.business_id,
+                                locationId: params.location_id,
+                                routedBy: params.routed_by,
+                                from: params.from,
+                            });
+                            if (!check.ok) {
+                                console.warn(`🚫 Media stream rejected (${check.reason}); closing`);
+                                connection.close();
+                                return;
+                            }
+                        }
+                        started = true;
+                        clearTimeout(startTimer);
                         const entry = registry.get(params.business_id);
                         if (!entry) {
                             console.warn(`❌ Media stream for unknown business "${params.business_id}"; closing`);
@@ -859,6 +924,7 @@ fastify.register(async (fastify) => {
 
         connection.on('close', async () => {
             console.log('👋 Twilio disconnected');
+            clearTimeout(startTimer);
             if (session) {
                 await session.close();
             }
