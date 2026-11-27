@@ -11,6 +11,7 @@
         "test:email": "node test-email.js",
         "test:analytics": "node test-analytics.js",
         "test:order": "node --test test-order-flow.js",
+        "test:security": "node --test test-twilio-security.js",
         "simulate": "node simulate-call.js"
     },
     "keywords": [

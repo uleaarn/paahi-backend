@@ -60,6 +60,7 @@ Type `/state` to see the call state and `/quit` to stop. Orders are saved to a l
 ```bash
 npm run test:order   # routing, isolation, row-level security, languages, ordering, no duplicates
 npm run test:menu
+npm run test:security   # Twilio signature and media-stream token checks
 npm run test:analytics
 npm test             # audio conversion
 ```
@@ -73,6 +74,8 @@ ngrok http 3000
 
 Set your Twilio number's voice webhook to `POST https://YOUR_DOMAIN/twiml`. Then either add that number to the business's `phone_numbers`, or set `DEFAULT_BUSINESS_ID`.
 
+Set `TWILIO_AUTH_TOKEN` to your Twilio account's auth token. Every `/twiml` request must carry a valid Twilio signature (otherwise 403), and every media stream must carry the one-call token `/twiml` gave it, so nobody else can start calls on your Deepgram and model bill. If a proxy changes the address Twilio sees, set `PUBLIC_BASE_URL`. For local tests without Twilio only: `TWILIO_SIGNATURE_CHECK=off`.
+
 ## Deployment
 
 See [DEPLOYMENT.md](DEPLOYMENT.md). Railway is configured through `railway.json`.
@@ -80,5 +83,5 @@ See [DEPLOYMENT.md](DEPLOYMENT.md). Railway is configured through `railway.json`
 ## Not built yet
 
 - Live call transfer to staff (today: a staff callback request)
-- Delivery rules, Twilio request signature checks, a voice fallback when TTS is down
+- Delivery rules, a voice fallback when TTS is down
 - Live-call verification of any language (see docs/LANGUAGES.md)
